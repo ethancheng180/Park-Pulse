@@ -1,5 +1,5 @@
 """Matching algorithm for pairing drivers with available spots."""
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, text
