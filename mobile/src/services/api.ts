@@ -145,6 +145,10 @@ export const spotAPI = {
         const response = await api.get<Spot[]>('/spots/available');
         return response.data;
     },
+
+    async deleteSpot(id: number): Promise<void> {
+        await api.delete(`/spots/${id}`);
+    },
 };
 
 // Request API

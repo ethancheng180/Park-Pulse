@@ -22,7 +22,8 @@ import {
     PanResponder,
     TextInput,
     Keyboard,
-    RefreshControl
+    RefreshControl,
+    Platform
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { useFocusEffect } from '@react-navigation/native';
@@ -327,7 +328,9 @@ export default function DriverScreen() {
                                             <View style={{ backgroundColor: COLORS.success, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginRight: 8 }}>
                                                 <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>ACTIVE</Text>
                                             </View>
-                                            <Text style={TYPOGRAPHY.caption}>Ends in 10m</Text>
+                                            <Text style={TYPOGRAPHY.caption}>
+                                                Ends in {Math.ceil((new Date(selectedSpot.expires_at).getTime() - Date.now()) / 60000)}m
+                                            </Text>
                                         </View>
                                     </View>
                                     <View>
@@ -340,7 +343,7 @@ export default function DriverScreen() {
                                     <Text style={TYPOGRAPHY.caption}>Confidence: High • Reported 2m ago</Text>
                                 </View>
 
-                                {selectedSpot.photo_url && (
+                                {selectedSpot.photo_url ? (
                                     <TouchableOpacity onPress={() => setShowPhotoModal(true)}>
                                         <Image
                                             source={{ uri: selectedSpot.photo_url }}
@@ -350,12 +353,21 @@ export default function DriverScreen() {
                                             <Text style={{ color: 'white', fontSize: 12 }}>🔍 Tap to expand</Text>
                                         </View>
                                     </TouchableOpacity>
+                                ) : (
+                                    <View style={[styles.fullImage, { backgroundColor: COLORS.background, justifyContent: 'center', alignItems: 'center' }]}>
+                                        <Text style={{ fontSize: 40 }}>🅿️</Text>
+                                        <Text style={[TYPOGRAPHY.caption, { marginTop: 8 }]}>No photo provided</Text>
+                                    </View>
                                 )}
 
                                 <Button
                                     title="Navigate to Spot"
                                     style={{ marginTop: SPACING.m }}
-                                    onPress={() => Linking.openURL(`maps://?daddr=${selectedSpot.latitude},${selectedSpot.longitude}`)}
+                                    onPress={() => {
+                                        const scheme = Platform.select({ ios: 'maps://?daddr=', android: 'google.navigation:q=' });
+                                        const link = `${scheme}${selectedSpot.latitude},${selectedSpot.longitude}`;
+                                        Linking.openURL(link);
+                                    }}
                                 />
                                 <Button
                                     title="Close"
@@ -400,7 +412,7 @@ export default function DriverScreen() {
                             maximumValue={30}
                             step={1}
                             value={maxPrice}
-                            onValueChange={(val) => {
+                            onValueChange={(val: number) => {
                                 setMaxPrice(val);
                                 if (val % 5 === 0) Haptics.selectionAsync();
                             }}

@@ -15,6 +15,7 @@ export const COLORS = {
 
     background: '#F2F2F7', // iOS Grouped Background
     card: '#FFFFFF',
+    surface: '#FFFFFF',
 
     // Text
     text: {

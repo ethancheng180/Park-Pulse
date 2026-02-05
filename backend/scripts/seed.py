@@ -16,6 +16,14 @@ def seed_database():
     try:
         print("Seeding database...")
         
+        # Clear existing data to prevent zombies
+        print("Clearing existing data...")
+        db.query(Spot).delete()
+        db.query(Reputation).delete()
+        db.query(User).delete()
+        db.commit()
+        print("✓ Tables cleared")
+        
         # Create test users
         print("Creating test users...")
         
@@ -71,40 +79,24 @@ def seed_database():
             pulser_id=pulser.id,
             address="Downtown LA, 123 Main St",
             expires_at=datetime.utcnow() + timedelta(minutes=4),
-            status='available'
+            status='available',
+            latitude=34.0522,
+            longitude=-118.2437
         )
         db.add(spot1)
         db.flush()
-        
-        # Set location (Downtown LA: 34.0522, -118.2437)
-        db.execute(
-            text("""
-                UPDATE spots 
-                SET location = ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography
-                WHERE id = :spot_id
-            """),
-            {"lat": 34.0522, "lng": -118.2437, "spot_id": spot1.id}
-        )
         
         # Santa Monica spot
         spot2 = Spot(
             pulser_id=pulser.id,
             address="Santa Monica, 456 Beach Blvd",
             expires_at=datetime.utcnow() + timedelta(minutes=3),
-            status='available'
+            status='available',
+            latitude=34.0195,
+            longitude=-118.4912
         )
         db.add(spot2)
         db.flush()
-        
-        # Set location (Santa Monica: 34.0195, -118.4912)
-        db.execute(
-            text("""
-                UPDATE spots 
-                SET location = ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography
-                WHERE id = :spot_id
-            """),
-            {"lat": 34.0195, "lng": -118.4912, "spot_id": spot2.id}
-        )
         
         db.commit()
         print(f"✓ Created spot 1: {spot1.address}")

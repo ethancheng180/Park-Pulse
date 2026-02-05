@@ -60,7 +60,7 @@ export default function AccountScreen({ onLogout }: Props) {
         // Mock API Call
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         const newCard: PaymentMethod = {
-            id: Date.now().toString(),
+            id: Date.now().toString() + Math.random().toString().slice(2, 6),
             type: 'mastercard',
             last4: Math.floor(1000 + Math.random() * 9000).toString(),
             isDefault: false

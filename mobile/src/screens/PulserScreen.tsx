@@ -67,8 +67,11 @@ export default function PulserScreen() {
                 onPress: async () => {
                     setSpots(prev => prev.filter(s => s.id !== id));
                     try {
-                        // Optimistic delete
-                    } catch (e) { loadSpots(); }
+                        await spotAPI.deleteSpot(id);
+                    } catch (e) {
+                        Alert.alert('Error', 'Failed to delete on server');
+                        loadSpots(); // Revert on failure
+                    }
                 }
             }
         ]);

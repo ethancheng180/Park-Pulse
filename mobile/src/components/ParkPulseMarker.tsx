@@ -27,11 +27,11 @@ export const ParkPulseMarker = ({ price, isSelected, isCluster, clusterCount }: 
             isSelected ? styles.selectedContainer : styles.defaultContainer
         ]}>
             <View style={[styles.iconBadge, isSelected && { backgroundColor: COLORS.primary }]}>
-                <Text style={[styles.iconText, isSelected && { color: COLORS.inverse }]}>P</Text>
+                <Text style={[styles.iconText, isSelected && { color: COLORS.text.inverse }]}>P</Text>
             </View>
             <Text style={[
                 styles.priceText,
-                isSelected ? { color: COLORS.inverse } : { color: COLORS.text.primary }
+                isSelected ? { color: COLORS.text.inverse } : { color: COLORS.text.primary }
             ]}>
                 ${price}
             </Text>

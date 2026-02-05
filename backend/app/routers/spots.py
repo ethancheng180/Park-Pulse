@@ -123,3 +123,29 @@ def get_available_spots(
         ))
     
     return result
+
+
+@router.delete("/{spot_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_spot(
+    spot_id: int,
+    current_user: User = Depends(get_current_pulser),
+    db: Session = Depends(get_db)
+):
+    """Delete a spot reported by the current user."""
+    spot = db.query(Spot).filter(Spot.id == spot_id).first()
+    
+    if not spot:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Spot not found"
+        )
+        
+    if spot.pulser_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to delete this spot"
+        )
+    
+    db.delete(spot)
+    db.commit()
+    return None
