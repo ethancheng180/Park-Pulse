@@ -93,3 +93,33 @@ def get_my_spots(
         ))
     
     return result
+
+
+@router.get("/available", response_model=List[SpotResponse])
+def get_available_spots(
+    db: Session = Depends(get_db)
+):
+    """Get all currently available spots for drivers to view on map."""
+    now = datetime.now(timezone.utc)
+    
+    # Get spots that are available and not expired
+    spots = db.query(Spot).filter(
+        Spot.status == 'available',
+        Spot.expires_at > now
+    ).order_by(Spot.created_at.desc()).limit(100).all()
+    
+    result = []
+    for spot in spots:
+        result.append(SpotResponse(
+            id=spot.id,
+            pulser_id=spot.pulser_id,
+            latitude=float(spot.latitude),
+            longitude=float(spot.longitude),
+            address=spot.address,
+            photo_url=spot.photo_url,
+            reported_at=spot.reported_at,
+            expires_at=spot.expires_at,
+            status=spot.status
+        ))
+    
+    return result

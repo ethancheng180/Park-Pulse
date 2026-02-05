@@ -16,6 +16,7 @@ export interface UnifiedMapProps {
     style?: any;
     onRegionChangeComplete?: (region: { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number }) => void;
     showCenterMarker?: boolean;
+    availableSpots?: Array<{ id: number; latitude: number; longitude: number; address?: string }>;
 }
 
 /**

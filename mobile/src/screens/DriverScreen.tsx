@@ -17,15 +17,14 @@ import {
     Modal,
 } from 'react-native';
 import { locationService } from '../services/location';
-import { requestAPI } from '../services/api';
-import { Location, Match } from '../types';
+import { requestAPI, spotAPI } from '../services/api';
+import { Location, Match, Spot } from '../types';
 
 import UnifiedMap from '../components/UnifiedMap';
 
 export default function DriverScreen() {
     const [destination, setDestination] = useState('');
     const [destinationCoords, setDestinationCoords] = useState<Location | null>(null);
-    const [radius, setRadius] = useState(500); // meters
     const [maxPrice, setMaxPrice] = useState(10); // dollars
     const [loading, setLoading] = useState(false);
     const [match, setMatch] = useState<Match | null>(null);
@@ -34,9 +33,11 @@ export default function DriverScreen() {
     const [suggestions, setSuggestions] = useState<string[]>([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [showPhotoModal, setShowPhotoModal] = useState(false);
+    const [availableSpots, setAvailableSpots] = useState<Spot[]>([]);
 
     useEffect(() => {
         getCurrentLocation();
+        loadAvailableSpots();
     }, []);
 
     useEffect(() => {
@@ -54,6 +55,16 @@ export default function DriverScreen() {
             setUserLocation(location);
         } catch (error) {
             console.error('Error getting location:', error);
+        }
+    };
+
+    const loadAvailableSpots = async () => {
+        try {
+            const spots = await spotAPI.getAvailableSpots();
+            setAvailableSpots(spots);
+            console.log('📍 Loaded', spots.length, 'available spots');
+        } catch (error) {
+            console.error('Error loading available spots:', error);
         }
     };
 
@@ -93,11 +104,11 @@ export default function DriverScreen() {
 
             setDestinationCoords(coords);
 
-            // Create parking request
+            // Create parking request with fixed 2000m radius
             const result = await requestAPI.createRequest(
                 coords.latitude,
                 coords.longitude,
-                radius,
+                2000, // Fixed radius
                 maxPrice,
                 destination
             );
@@ -183,24 +194,6 @@ export default function DriverScreen() {
                     </View>
 
                     <View style={styles.sliderRow}>
-                        <Text style={styles.label}>Radius: {radius}m</Text>
-                        <View style={styles.radiusButtons}>
-                            <TouchableOpacity
-                                style={styles.radiusButton}
-                                onPress={() => setRadius(Math.max(100, radius - 100))}
-                            >
-                                <Text>-</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.radiusButton}
-                                onPress={() => setRadius(Math.min(2000, radius + 100))}
-                            >
-                                <Text>+</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-
-                    <View style={styles.sliderRow}>
                         <Text style={styles.label}>Max Price: ${maxPrice}</Text>
                         <View style={styles.radiusButtons}>
                             <TouchableOpacity
@@ -230,6 +223,13 @@ export default function DriverScreen() {
                         )}
                     </TouchableOpacity>
 
+                    {/* Available spots count */}
+                    {availableSpots.length > 0 && (
+                        <Text style={styles.spotsAvailable}>
+                            📍 {availableSpots.length} parking spot{availableSpots.length !== 1 ? 's' : ''} available nearby
+                        </Text>
+                    )}
+
                     {userLocation ? (
                         <UnifiedMap
                             style={styles.map}
@@ -241,7 +241,7 @@ export default function DriverScreen() {
                             }}
                             userLocation={userLocation}
                             destinationCoords={destinationCoords}
-                            radius={radius}
+                            availableSpots={availableSpots}
                         />
                     ) : (
                         <View style={styles.mapPlaceholder}>
@@ -582,5 +582,13 @@ const styles = StyleSheet.create({
         fontSize: 14,
         marginTop: 20,
         opacity: 0.7,
+    },
+    spotsAvailable: {
+        fontSize: 14,
+        color: '#34C759',
+        fontWeight: '600',
+        textAlign: 'center',
+        marginTop: 10,
+        marginBottom: 5,
     },
 });

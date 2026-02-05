@@ -133,6 +133,11 @@ export const spotAPI = {
         const response = await api.get<Spot[]>('/spots');
         return response.data;
     },
+
+    async getAvailableSpots(): Promise<Spot[]> {
+        const response = await api.get<Spot[]>('/spots/available');
+        return response.data;
+    },
 };
 
 // Request API

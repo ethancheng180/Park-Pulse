@@ -34,8 +34,28 @@ export const locationService = {
             });
 
             if (result && result.length > 0) {
-                const address = result[0];
-                return `${address.street || ''}, ${address.city || ''}, ${address.region || ''}`.trim();
+                const addr = result[0];
+                // Build full address with street number
+                const parts: string[] = [];
+
+                // Include street number if available
+                if (addr.streetNumber) {
+                    parts.push(addr.streetNumber);
+                }
+                if (addr.street) {
+                    parts.push(addr.street);
+                }
+
+                const streetAddress = parts.join(' ');
+                const cityState = [addr.city, addr.region].filter(Boolean).join(', ');
+
+                if (streetAddress && cityState) {
+                    return `${streetAddress}, ${cityState}`;
+                } else if (streetAddress) {
+                    return streetAddress;
+                } else if (cityState) {
+                    return cityState;
+                }
             }
             return 'Unknown location';
         } catch (error) {

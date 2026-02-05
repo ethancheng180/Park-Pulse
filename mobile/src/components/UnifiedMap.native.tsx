@@ -46,6 +46,7 @@ interface MapProps {
     style?: any;
     onRegionChangeComplete?: (region: { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number }) => void;
     showCenterMarker?: boolean;
+    availableSpots?: Array<{ id: number; latitude: number; longitude: number; address?: string }>;
 }
 
 export default function UnifiedMap({
@@ -58,6 +59,7 @@ export default function UnifiedMap({
     style,
     onRegionChangeComplete,
     showCenterMarker,
+    availableSpots = [],
 }: MapProps) {
     return (
         <View style={[styles.container, style]}>
@@ -92,6 +94,16 @@ export default function UnifiedMap({
                         pinColor="blue"
                     />
                 )}
+                {/* Render available parking spots as markers */}
+                {availableSpots.map((spot) => (
+                    <Marker
+                        key={`spot-${spot.id}`}
+                        coordinate={{ latitude: spot.latitude, longitude: spot.longitude }}
+                        title="🅿️ Available Spot"
+                        description={spot.address || 'Parking spot available'}
+                        pinColor="orange"
+                    />
+                ))}
             </MapView>
 
             {showCenterMarker && (
