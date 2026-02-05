@@ -8,6 +8,9 @@ export interface User {
     role: 'driver' | 'pulser' | 'both';
     balance: number;
     reputation?: Reputation;
+    banned: boolean;
+    ban_reason?: string;
+    appeal_status: 'none' | 'pending' | 'approved' | 'rejected';
     created_at: string;
 }
 
@@ -16,6 +19,7 @@ export interface Reputation {
     successful_reports: number;
     failed_reports: number;
     total_earnings: number;
+    false_report_strikes: number;
 }
 
 export interface Spot {
@@ -27,6 +31,7 @@ export interface Spot {
     photo_url?: string;
     reported_at: string;
     expires_at: string;
+    price?: number;
     status: 'available' | 'matched' | 'verified' | 'expired' | 'failed';
 }
 

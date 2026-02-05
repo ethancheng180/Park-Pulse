@@ -17,6 +17,8 @@ class User(Base):
     stripe_account_id = Column(String(255))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     banned = Column(Boolean, default=False)
+    ban_reason = Column(String(255), nullable=True)
+    appeal_status = Column(String(20), default="none")  # none, pending, approved, rejected
     
     # Relationships
     reputation = relationship("Reputation", back_populates="user", uselist=False)
@@ -25,6 +27,7 @@ class User(Base):
     
     __table_args__ = (
         CheckConstraint("role IN ('driver', 'pulser', 'both')", name="check_user_role"),
+        CheckConstraint("appeal_status IN ('none', 'pending', 'approved', 'rejected')", name="check_appeal_status"),
     )
 
 
@@ -38,6 +41,7 @@ class Reputation(Base):
     failed_reports = Column(Integer, default=0)
     total_earnings = Column(Numeric(10, 2), default=0.00)
     last_report_at = Column(DateTime(timezone=True))
+    false_report_strikes = Column(Integer, default=0)
     
     # Relationships
     user = relationship("User", back_populates="reputation")

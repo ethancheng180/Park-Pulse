@@ -1,1039 +1,541 @@
 /**
- * Premium Driver Screen - Find Parking with Bottom Sheet & Filters
+ * Premium Driver Screen - Apple Maps Style
+ * Updates:
+ * - Robust Sync: Fetches latest data on refresh/focus
+ * - Filters: Client-side filtering for immediate feedback
+ * - Logging: Debug logs for verification
  */
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
     View,
     Text,
-    TextInput,
-    TouchableOpacity,
     StyleSheet,
-    Alert,
-    ActivityIndicator,
     FlatList,
     Image,
     Modal,
     Animated,
     Dimensions,
     Linking,
+    TouchableOpacity,
+    StatusBar,
+    SafeAreaView,
     PanResponder,
+    TextInput,
+    Keyboard,
+    RefreshControl
 } from 'react-native';
+import Slider from '@react-native-community/slider';
+import { useFocusEffect } from '@react-navigation/native';
+import * as Haptics from 'expo-haptics';
+import { BlurView } from 'expo-blur';
 import { locationService } from '../services/location';
-import { requestAPI, spotAPI } from '../services/api';
-import { Location, Match, Spot } from '../types';
+import { spotAPI } from '../services/api';
+import { Spot, Location } from '../types';
 import UnifiedMap from '../components/UnifiedMap';
+import { COLORS, SPACING, SHADOWS, RADIUS, TYPOGRAPHY } from '../theme';
+import { Button, SearchPill, FilterChip, Card } from '../components/Shared';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const BOTTOM_SHEET_MIN = 120;
-const BOTTOM_SHEET_MID = SCREEN_HEIGHT * 0.4;
-const BOTTOM_SHEET_MAX = SCREEN_HEIGHT * 0.75;
 
-// Distance options in meters
-const DISTANCE_OPTIONS = [
-    { label: '0.5 mi', value: 804 },
-    { label: '1 mi', value: 1609 },
-    { label: '2 mi', value: 3218 },
-    { label: '5 mi', value: 8046 },
-];
+const SNAP_TOP = SCREEN_HEIGHT * 0.15;
+const SNAP_MID = SCREEN_HEIGHT * 0.55;
+const SNAP_BOTTOM = SCREEN_HEIGHT - 130;
 
 export default function DriverScreen() {
-    // Core state
-    const [destination, setDestination] = useState('');
-    const [destinationCoords, setDestinationCoords] = useState<Location | null>(null);
+    // --- STATE ---
+    // Data
+    const [allSpots, setAllSpots] = useState<Spot[]>([]); // Source of Truth
+    const [filteredSpots, setFilteredSpots] = useState<Spot[]>([]); // View Model
     const [userLocation, setUserLocation] = useState<Location | null>(null);
-    const [loading, setLoading] = useState(false);
-    const [availableSpots, setAvailableSpots] = useState<Spot[]>([]);
+    const [refreshing, setRefreshing] = useState(false);
 
-    // Match state
-    const [match, setMatch] = useState<Match | null>(null);
-    const [timeRemaining, setTimeRemaining] = useState(240);
-
-    // Filter state
+    // Filters
     const [maxPrice, setMaxPrice] = useState(15);
-    const [maxDistance, setMaxDistance] = useState(3218); // 2 miles default
-    const [showFilterModal, setShowFilterModal] = useState(false);
+    const [showPriceFilter, setShowPriceFilter] = useState(false);
+    // Radius in km? Assuming Mock is nearby, we'll just filter by basic distance if we had coords
+    // For MVP, we'll keep it simple: Filter by PRICE and assume backend returned radius.
 
-    // Selection state
-    const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
-
-    // Suggestions
+    // Search
+    const [destination, setDestination] = useState('');
+    const [isSearching, setIsSearching] = useState(false);
     const [suggestions, setSuggestions] = useState<string[]>([]);
-    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
 
-    // Photo modal
+    // Selection
+    const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
     const [showPhotoModal, setShowPhotoModal] = useState(false);
 
-    // Bottom sheet animation
-    const sheetPosition = useRef(new Animated.Value(BOTTOM_SHEET_MIN)).current;
-    const [sheetExpanded, setSheetExpanded] = useState(false);
+    // --- ANIMATIONS ---
+    const panY = useRef(new Animated.Value(SNAP_BOTTOM)).current;
 
-    // Initialize
-    useEffect(() => {
-        getCurrentLocation();
-        loadAvailableSpots();
-        // Refresh spots every 30 seconds
-        const interval = setInterval(loadAvailableSpots, 30000);
-        return () => clearInterval(interval);
-    }, []);
+    const panResponder = useRef(
+        PanResponder.create({
+            onStartShouldSetPanResponder: () => true,
+            onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dy) > 10,
+            onPanResponderMove: (_, gestureState) => panY.setValue(gestureState.moveY),
+            onPanResponderRelease: (_, gestureState) => {
+                const { moveY, vy } = gestureState;
+                let target = SNAP_BOTTOM;
+                if (moveY < SCREEN_HEIGHT * 0.35 || vy < -0.5) target = SNAP_TOP;
+                else if (moveY < SCREEN_HEIGHT * 0.75 || vy < -0.2) target = SNAP_MID;
 
-    // Match timer
-    useEffect(() => {
-        if (match) {
-            const timer = setInterval(() => {
-                setTimeRemaining((prev) => (prev > 0 ? prev - 1 : 0));
-            }, 1000);
-            return () => clearInterval(timer);
-        }
-    }, [match]);
+                Animated.spring(panY, {
+                    toValue: target,
+                    useNativeDriver: false,
+                    friction: 6,
+                    tension: 50,
+                }).start();
+            }
+        })
+    ).current;
 
-    // Calculate distance between two coordinates
-    const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-        const R = 6371000; // Earth radius in meters
-        const dLat = (lat2 - lat1) * Math.PI / 180;
-        const dLon = (lon2 - lon1) * Math.PI / 180;
-        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-            Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return R * c;
+    const snapTo = (value: number) => {
+        Animated.spring(panY, {
+            toValue: value,
+            useNativeDriver: false,
+            friction: 7,
+        }).start();
     };
 
-    // Filtered spots based on price and distance
-    const filteredSpots = useMemo(() => {
-        if (!userLocation) return availableSpots;
+    // --- EFFECTS ---
 
-        return availableSpots.filter(spot => {
-            const distance = calculateDistance(
-                userLocation.latitude, userLocation.longitude,
-                spot.latitude, spot.longitude
-            );
-            // Filter by distance
-            if (distance > maxDistance) return false;
-            // All spots pass (price filter would go here if spots had prices)
-            return true;
-        }).map(spot => ({
-            ...spot,
-            distance: calculateDistance(
-                userLocation.latitude, userLocation.longitude,
-                spot.latitude, spot.longitude
-            )
-        })).sort((a, b) => a.distance - b.distance);
-    }, [availableSpots, userLocation, maxDistance, maxPrice]);
+    // Initial Load & Location
+    useEffect(() => {
+        getCurrentLocation();
+        fetchSpots(); // Initial fetch
+    }, []);
+
+    // Re-fetch on Tab Focus to ensure we see Pulser updates
+    useFocusEffect(
+        useCallback(() => {
+            fetchSpots();
+        }, [])
+    );
+
+    // Filter Logic: Runs whenever allSpots or maxPrice changes
+    useEffect(() => {
+        applyFilters();
+    }, [allSpots, maxPrice]);
 
     const getCurrentLocation = async () => {
         try {
-            const location = await locationService.getCurrentLocation();
-            setUserLocation(location);
-        } catch (error) {
-            console.error('Error getting location:', error);
-        }
+            const loc = await locationService.getCurrentLocation();
+            setUserLocation(loc);
+        } catch (e) { console.error(e); }
     };
 
-    const loadAvailableSpots = async () => {
+    const fetchSpots = async () => {
+        setRefreshing(true);
         try {
+            console.log('Fetching spots from backend...');
             const spots = await spotAPI.getAvailableSpots();
-            setAvailableSpots(spots);
-            console.log('📍 Loaded', spots.length, 'available spots');
-        } catch (error) {
-            console.error('Error loading available spots:', error);
+
+            // Enrich with mock prices if missing (deterministic based on ID)
+            const enriched = spots.map(s => ({
+                ...s,
+                price: s.price ?? ((s.id * 7) % 15) + 5
+            }));
+
+            console.log(`Fetched ${enriched.length} spots.`);
+            setAllSpots(enriched);
+        } catch (e) {
+            console.error('Fetch failed', e);
+        } finally {
+            setRefreshing(false);
         }
     };
 
-    const handleTextChange = async (text: string) => {
-        setDestination(text);
+    const applyFilters = () => {
+        // Filter by Price
+        const filtered = allSpots.filter(s => {
+            const price = s.price || 0;
+            return price <= maxPrice;
+        });
+        console.log(`Applied filters: MaxPrice=${maxPrice}. Result: ${filtered.length} spots.`);
+        setFilteredSpots(filtered);
+    };
+
+    // --- HANDLERS ---
+
+    const handleSearchTextChange = async (text: string) => {
+        setSearchQuery(text);
         if (text.length > 2) {
-            const results = await locationService.getSuggestions(text);
+            const results = await locationService.getSuggestions(text).catch(() => []);
             setSuggestions(results);
-            setShowSuggestions(true);
         } else {
             setSuggestions([]);
-            setShowSuggestions(false);
         }
     };
 
-    const handleSelectSuggestion = (address: string) => {
+    const handleSelectSuggestion = async (address: string) => {
         setDestination(address);
-        setSuggestions([]);
-        setShowSuggestions(false);
-    };
+        setIsSearching(false);
+        Keyboard.dismiss();
 
-    const handleFindParking = async () => {
-        if (!destination) {
-            Alert.alert('Error', 'Please enter a destination');
-            return;
+        // Mock navigation to coords
+        const coords = await locationService.geocode(address);
+        if (coords) {
+            console.log('Navigating to destination:', coords);
+            // In real app, animate map to coords
         }
 
-        setLoading(true);
-        try {
-            const coords = await locationService.geocode(destination);
-            if (!coords) {
-                Alert.alert('Error', 'Could not find destination');
-                setLoading(false);
-                return;
-            }
+        // Trigger a fresh fetch for the new area
+        fetchSpots();
+    };
 
-            setDestinationCoords(coords);
-
-            const result = await requestAPI.createRequest(
-                coords.latitude,
-                coords.longitude,
-                maxDistance,
-                maxPrice,
-                destination
-            );
-
-            if (result.match) {
-                setMatch(result.match);
-                setTimeRemaining(240);
-                expandSheet();
-            } else {
-                Alert.alert('No Spots Found', 'No parking spots available near your destination.');
-            }
-        } catch (error: any) {
-            console.error('Error finding parking:', error);
-            Alert.alert('Error', error.response?.data?.detail || 'Failed to find parking');
-        } finally {
-            setLoading(false);
+    const handleSpotSelect = (spotId: number) => {
+        const spot = filteredSpots.find(s => s.id === spotId);
+        if (spot) {
+            setSelectedSpot(spot);
+            Haptics.selectionAsync();
+            snapTo(SNAP_MID);
         }
     };
 
-    const handleSpotSelect = (spot: Spot & { distance?: number }) => {
-        setSelectedSpot(spot);
-        expandSheet();
-    };
+    // --- RENDER ---
 
-    const handleNavigate = (spot: Spot) => {
-        const url = `maps://app?daddr=${spot.latitude},${spot.longitude}`;
-        Linking.openURL(url).catch(() => {
-            // Fallback to Google Maps
-            Linking.openURL(`https://maps.google.com/maps?daddr=${spot.latitude},${spot.longitude}`);
-        });
-    };
-
-    const handleVerify = async (found: boolean) => {
-        if (!match) return;
-
-        setLoading(true);
-        try {
-            await requestAPI.verifyMatch(match.id, found);
-            if (found) {
-                Alert.alert('🎉 Success!', 'Enjoy your parking spot!');
-            } else {
-                Alert.alert('Spot Not Found', 'We\'ll find you another spot.');
-            }
-            setMatch(null);
-            setSelectedSpot(null);
-            loadAvailableSpots();
-        } catch (error: any) {
-            Alert.alert('Error', 'Failed to verify spot');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const expandSheet = () => {
-        Animated.spring(sheetPosition, {
-            toValue: BOTTOM_SHEET_MID,
-            useNativeDriver: false,
-        }).start();
-        setSheetExpanded(true);
-    };
-
-    const collapseSheet = () => {
-        Animated.spring(sheetPosition, {
-            toValue: BOTTOM_SHEET_MIN,
-            useNativeDriver: false,
-        }).start();
-        setSheetExpanded(false);
-    };
-
-    const formatTime = (seconds: number) => {
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
-    };
-
-    const formatDistance = (meters: number) => {
-        if (meters < 1000) return `${Math.round(meters)}m`;
-        return `${(meters / 1609).toFixed(1)} mi`;
-    };
-
-    const getTimeAgo = (dateString: string) => {
-        const date = new Date(dateString);
-        const now = new Date();
-        const diffMs = now.getTime() - date.getTime();
-        const diffMins = Math.floor(diffMs / 60000);
-        if (diffMins < 1) return 'Just now';
-        if (diffMins < 60) return `${diffMins}m ago`;
-        return `${Math.floor(diffMins / 60)}h ago`;
-    };
-
-    // Render spot card in bottom sheet
-    const renderSpotCard = ({ item }: { item: Spot & { distance?: number } }) => {
-        const isSelected = selectedSpot?.id === item.id;
-        return (
-            <TouchableOpacity
-                style={[styles.spotCard, isSelected && styles.spotCardSelected]}
-                onPress={() => handleSpotSelect(item)}
-            >
-                <View style={styles.spotCardHeader}>
-                    <View style={styles.pricePill}>
-                        <Text style={styles.priceText}>$3</Text>
-                    </View>
-                    <View style={styles.spotMeta}>
-                        <Text style={styles.spotType}>🅿️ Street</Text>
-                        <Text style={styles.spotTime}>{getTimeAgo(item.reported_at)}</Text>
-                    </View>
-                </View>
-
-                <Text style={styles.spotAddress} numberOfLines={2}>
-                    {item.address || 'Parking spot available'}
+    const renderSheetHandle = () => (
+        <View style={styles.sheetHandleContainer} {...panResponder.panHandlers}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.sheetHeader}>
+                <Text style={TYPOGRAPHY.h3}>
+                    {selectedSpot ? 'Selected Spot' : `${filteredSpots.length} spots found`}
                 </Text>
-
-                <View style={styles.spotCardFooter}>
-                    <Text style={styles.spotDistance}>
-                        📍 {item.distance ? formatDistance(item.distance) : '—'}
-                    </Text>
-                    {isSelected && (
-                        <TouchableOpacity
-                            style={styles.navigateButton}
-                            onPress={() => handleNavigate(item)}
-                        >
-                            <Text style={styles.navigateButtonText}>Navigate →</Text>
-                        </TouchableOpacity>
-                    )}
-                </View>
-
-                {item.photo_url && (
-                    <View style={styles.photoIndicator}>
-                        <Text style={styles.photoIndicatorText}>📷</Text>
-                    </View>
-                )}
-            </TouchableOpacity>
-        );
-    };
-
-    // Filter Modal
-    const renderFilterModal = () => (
-        <Modal
-            visible={showFilterModal}
-            transparent
-            animationType="slide"
-        >
-            <View style={styles.modalOverlay}>
-                <View style={styles.filterModalContent}>
-                    <Text style={styles.filterModalTitle}>Filters</Text>
-
-                    <View style={styles.filterSection}>
-                        <Text style={styles.filterLabel}>Max Price: ${maxPrice}</Text>
-                        <View style={styles.sliderTrack}>
-                            {[5, 10, 15, 20, 25, 30].map((price) => (
-                                <TouchableOpacity
-                                    key={price}
-                                    style={[
-                                        styles.priceChip,
-                                        maxPrice === price && styles.priceChipSelected
-                                    ]}
-                                    onPress={() => setMaxPrice(price)}
-                                >
-                                    <Text style={[
-                                        styles.priceChipText,
-                                        maxPrice === price && styles.priceChipTextSelected
-                                    ]}>${price}</Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
-                    </View>
-
-                    <View style={styles.filterSection}>
-                        <Text style={styles.filterLabel}>Max Distance</Text>
-                        <View style={styles.sliderTrack}>
-                            {DISTANCE_OPTIONS.map((option) => (
-                                <TouchableOpacity
-                                    key={option.value}
-                                    style={[
-                                        styles.priceChip,
-                                        maxDistance === option.value && styles.priceChipSelected
-                                    ]}
-                                    onPress={() => setMaxDistance(option.value)}
-                                >
-                                    <Text style={[
-                                        styles.priceChipText,
-                                        maxDistance === option.value && styles.priceChipTextSelected
-                                    ]}>{option.label}</Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
-                    </View>
-
-                    <TouchableOpacity
-                        style={styles.filterDoneButton}
-                        onPress={() => setShowFilterModal(false)}
-                    >
-                        <Text style={styles.filterDoneButtonText}>Done</Text>
+                {!selectedSpot && (
+                    <TouchableOpacity onPress={fetchSpots}>
+                        <Text style={{ color: COLORS.secondary, fontSize: 13 }}>Pull to refresh</Text>
                     </TouchableOpacity>
-                </View>
+                )}
             </View>
-        </Modal>
+        </View>
     );
 
-    // If we have an active match, show verification UI
-    if (match) {
-        return (
-            <View style={styles.container}>
-                <View style={styles.matchContainer}>
-                    <View style={styles.matchHeader}>
-                        <Text style={styles.matchTitle}>🎯 Spot Found!</Text>
-                        <View style={styles.timerBadge}>
-                            <Text style={styles.timerText}>{formatTime(timeRemaining)}</Text>
-                        </View>
-                    </View>
-
-                    <UnifiedMap
-                        style={styles.matchMap}
-                        initialRegion={{
-                            latitude: match.spot.latitude,
-                            longitude: match.spot.longitude,
-                            latitudeDelta: 0.01,
-                            longitudeDelta: 0.01,
-                        }}
-                        spotLocation={{ latitude: match.spot.latitude, longitude: match.spot.longitude }}
-                        spotAddress={match.spot.address || undefined}
-                        userLocation={userLocation}
-                    />
-
-                    <View style={styles.matchDetails}>
-                        <View style={styles.matchPricePill}>
-                            <Text style={styles.matchPriceText}>${match.amount.toFixed(2)}</Text>
-                        </View>
-                        <Text style={styles.matchAddress}>{match.spot.address || 'Parking spot'}</Text>
-                        <Text style={styles.matchDistance}>
-                            📍 {formatDistance(match.distance_meters)} away
-                        </Text>
-
-                        {match.spot.photo_url && (
-                            <TouchableOpacity
-                                style={styles.photoPreview}
-                                onPress={() => setShowPhotoModal(true)}
-                            >
-                                <Image
-                                    source={{ uri: match.spot.photo_url }}
-                                    style={styles.photoThumbnail}
-                                    resizeMode="cover"
-                                />
-                                <Text style={styles.viewPhotoText}>Tap to view photo</Text>
-                            </TouchableOpacity>
-                        )}
-                    </View>
-
-                    <View style={styles.matchActions}>
-                        <TouchableOpacity
-                            style={styles.navigateFullButton}
-                            onPress={() => handleNavigate(match.spot)}
-                        >
-                            <Text style={styles.navigateFullButtonText}>🧭 Navigate</Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    <View style={styles.verifyActions}>
-                        <TouchableOpacity
-                            style={[styles.verifyButton, styles.verifyFoundButton]}
-                            onPress={() => handleVerify(true)}
-                            disabled={loading}
-                        >
-                            <Text style={styles.verifyButtonText}>✅ Found It</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={[styles.verifyButton, styles.verifyNotFoundButton]}
-                            onPress={() => handleVerify(false)}
-                            disabled={loading}
-                        >
-                            <Text style={styles.verifyNotFoundText}>❌ Not There</Text>
-                        </TouchableOpacity>
-                    </View>
+    const renderSpotItem = ({ item }: { item: Spot }) => (
+        <Card style={styles.spotCard} onPress={() => handleSpotSelect(item.id)}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <View>
+                    <Text style={TYPOGRAPHY.h3}>{item.address || 'Unknown'}</Text>
+                    <Text style={[TYPOGRAPHY.body, { color: COLORS.success }]}>${item.price}</Text>
                 </View>
-
-                {/* Photo Modal */}
-                <Modal visible={showPhotoModal} transparent animationType="fade">
-                    <View style={styles.photoModalOverlay}>
-                        <TouchableOpacity
-                            style={styles.photoModalClose}
-                            onPress={() => setShowPhotoModal(false)}
-                        >
-                            <Text style={styles.photoModalCloseText}>✕ Close</Text>
-                        </TouchableOpacity>
-                        {match.spot.photo_url && (
-                            <Image
-                                source={{ uri: match.spot.photo_url }}
-                                style={styles.photoModalImage}
-                                resizeMode="contain"
-                            />
-                        )}
-                    </View>
-                </Modal>
+                {item.photo_url && (
+                    <Image source={{ uri: item.photo_url }} style={styles.thumb} />
+                )}
             </View>
-        );
-    }
+        </Card>
+    );
 
-    // Main search UI
     return (
         <View style={styles.container}>
-            {/* Map takes full screen */}
-            {userLocation ? (
-                <UnifiedMap
-                    style={styles.fullMap}
-                    initialRegion={{
-                        latitude: userLocation.latitude,
-                        longitude: userLocation.longitude,
-                        latitudeDelta: 0.02,
-                        longitudeDelta: 0.02,
-                    }}
-                    userLocation={userLocation}
-                    destinationCoords={destinationCoords}
-                    availableSpots={filteredSpots}
-                />
-            ) : (
-                <View style={styles.mapLoading}>
-                    <ActivityIndicator size="large" color="#007AFF" />
-                    <Text style={styles.mapLoadingText}>Loading map...</Text>
+            <StatusBar barStyle="dark-content" />
+
+            {/* Map */}
+            <UnifiedMap
+                style={StyleSheet.absoluteFillObject}
+                userLocation={userLocation}
+                availableSpots={filteredSpots}
+                selectedSpotId={selectedSpot?.id}
+                onSpotSelect={handleSpotSelect}
+                initialRegion={userLocation ? {
+                    latitude: userLocation.latitude,
+                    longitude: userLocation.longitude,
+                    latitudeDelta: 0.02,
+                    longitudeDelta: 0.02,
+                } : undefined}
+            />
+
+            {/* Top Search & Filter */}
+            {!isSearching && (
+                <SafeAreaView style={styles.topContainer}>
+                    <SearchPill
+                        placeholder={destination || "Search destination"}
+                        value={destination}
+                        onPress={() => {
+                            setSearchQuery(destination);
+                            setIsSearching(true);
+                        }}
+                    />
+                    <View style={styles.filterRow}>
+                        <FilterChip
+                            label={`Max $${maxPrice}`}
+                            onPress={() => setShowPriceFilter(true)}
+                            selected={true}
+                        />
+                        <TouchableOpacity style={styles.refreshBadge} onPress={fetchSpots}>
+                            <Text style={{ fontSize: 12 }}>🔄</Text>
+                        </TouchableOpacity>
+                    </View>
+                </SafeAreaView>
+            )}
+
+            {/* Expanded Search Overlay */}
+            {isSearching && (
+                <View style={styles.searchOverlay}>
+                    <SafeAreaView style={{ flex: 1 }}>
+                        <View style={styles.searchHeader}>
+                            <View style={styles.searchInputContainer}>
+                                <Text style={styles.searchIcon}>🔍</Text>
+                                <TextInput
+                                    autoFocus
+                                    style={styles.searchInput}
+                                    placeholder="Search destination"
+                                    value={searchQuery}
+                                    onChangeText={handleSearchTextChange}
+                                    placeholderTextColor={COLORS.text.tertiary}
+                                />
+                                {searchQuery.length > 0 && (
+                                    <TouchableOpacity onPress={() => setSearchQuery('')}>
+                                        <Text style={{ color: COLORS.text.secondary }}>✕</Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                            <Button
+                                title="Cancel"
+                                variant="ghost"
+                                onPress={() => setIsSearching(false)}
+                                style={{ width: 80 }}
+                            />
+                        </View>
+                        <FlatList
+                            data={suggestions}
+                            keyExtractor={(item, index) => index.toString()}
+                            keyboardShouldPersistTaps="handled"
+                            renderItem={({ item }) => (
+                                <TouchableOpacity
+                                    style={styles.suggestionItem}
+                                    onPress={() => handleSelectSuggestion(item)}
+                                >
+                                    <View style={styles.pinIcon}><Text>📍</Text></View>
+                                    <Text style={TYPOGRAPHY.body}>{item}</Text>
+                                </TouchableOpacity>
+                            )}
+                        />
+                    </SafeAreaView>
                 </View>
             )}
 
-            {/* Search Bar Overlay */}
-            <View style={styles.searchOverlay}>
-                <View style={styles.searchBar}>
-                    <TextInput
-                        style={styles.searchInput}
-                        placeholder="Where are you heading?"
-                        placeholderTextColor="#999"
-                        value={destination}
-                        onChangeText={handleTextChange}
-                        onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
-                    />
-                    {showSuggestions && suggestions.length > 0 && (
-                        <View style={styles.suggestionsDropdown}>
-                            <FlatList
-                                data={suggestions}
-                                keyExtractor={(item, index) => index.toString()}
-                                renderItem={({ item }) => (
-                                    <TouchableOpacity
-                                        style={styles.suggestionItem}
-                                        onPress={() => handleSelectSuggestion(item)}
-                                    >
-                                        <Text numberOfLines={1} style={styles.suggestionText}>📍 {item}</Text>
+            {/* Bottom Sheet */}
+            <Animated.View style={[styles.bottomSheet, { top: panY }]}>
+                {renderSheetHandle()}
+                <View style={styles.sheetContent}>
+                    {selectedSpot ? (
+                        <View style={{ padding: SPACING.m }}>
+                            <Card>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <View>
+                                        <Text style={TYPOGRAPHY.h2}>Spot Details</Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                                            <View style={{ backgroundColor: COLORS.success, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginRight: 8 }}>
+                                                <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>ACTIVE</Text>
+                                            </View>
+                                            <Text style={TYPOGRAPHY.caption}>Ends in 10m</Text>
+                                        </View>
+                                    </View>
+                                    <View>
+                                        <Text style={[TYPOGRAPHY.h3, { color: COLORS.success }]}>${selectedSpot.price}</Text>
+                                    </View>
+                                </View>
+
+                                <View style={{ marginVertical: SPACING.m }}>
+                                    <Text style={TYPOGRAPHY.body}>{selectedSpot.address}</Text>
+                                    <Text style={TYPOGRAPHY.caption}>Confidence: High • Reported 2m ago</Text>
+                                </View>
+
+                                {selectedSpot.photo_url && (
+                                    <TouchableOpacity onPress={() => setShowPhotoModal(true)}>
+                                        <Image
+                                            source={{ uri: selectedSpot.photo_url }}
+                                            style={styles.fullImage}
+                                        />
+                                        <View style={{ position: 'absolute', bottom: 10, right: 10, backgroundColor: 'rgba(0,0,0,0.6)', padding: 6, borderRadius: 15 }}>
+                                            <Text style={{ color: 'white', fontSize: 12 }}>🔍 Tap to expand</Text>
+                                        </View>
                                     </TouchableOpacity>
                                 )}
-                            />
+
+                                <Button
+                                    title="Navigate to Spot"
+                                    style={{ marginTop: SPACING.m }}
+                                    onPress={() => Linking.openURL(`maps://?daddr=${selectedSpot.latitude},${selectedSpot.longitude}`)}
+                                />
+                                <Button
+                                    title="Close"
+                                    variant="outline"
+                                    style={{ marginTop: SPACING.s }}
+                                    onPress={() => { setSelectedSpot(null); snapTo(SNAP_BOTTOM); }}
+                                />
+                            </Card>
                         </View>
-                    )}
-                </View>
-
-                {/* Filter Chips */}
-                <View style={styles.filterChips}>
-                    <TouchableOpacity
-                        style={styles.filterChip}
-                        onPress={() => setShowFilterModal(true)}
-                    >
-                        <Text style={styles.filterChipText}>💰 Max ${maxPrice}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={styles.filterChip}
-                        onPress={() => setShowFilterModal(true)}
-                    >
-                        <Text style={styles.filterChipText}>
-                            📍 {DISTANCE_OPTIONS.find(d => d.value === maxDistance)?.label}
-                        </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={styles.filterChipRefresh}
-                        onPress={loadAvailableSpots}
-                    >
-                        <Text style={styles.filterChipText}>🔄</Text>
-                    </TouchableOpacity>
-                </View>
-
-                {/* Find Button */}
-                <TouchableOpacity
-                    style={[styles.findButton, loading && styles.findButtonDisabled]}
-                    onPress={handleFindParking}
-                    disabled={loading}
-                >
-                    {loading ? (
-                        <ActivityIndicator color="#fff" />
                     ) : (
-                        <Text style={styles.findButtonText}>🔍 Find Parking</Text>
+                        <FlatList
+                            data={filteredSpots}
+                            keyExtractor={i => i.id.toString()}
+                            renderItem={renderSpotItem}
+                            contentContainerStyle={{ paddingBottom: 400 }}
+                            refreshControl={
+                                <RefreshControl refreshing={refreshing} onRefresh={fetchSpots} />
+                            }
+                        />
                     )}
-                </TouchableOpacity>
-            </View>
-
-            {/* Bottom Sheet */}
-            <Animated.View style={[styles.bottomSheet, { height: sheetPosition }]}>
-                <TouchableOpacity
-                    style={styles.sheetHandle}
-                    onPress={sheetExpanded ? collapseSheet : expandSheet}
-                >
-                    <View style={styles.handleBar} />
-                </TouchableOpacity>
-
-                <View style={styles.sheetHeader}>
-                    <Text style={styles.sheetTitle}>
-                        {filteredSpots.length} Spots Nearby
-                    </Text>
-                    <TouchableOpacity onPress={() => setShowFilterModal(true)}>
-                        <Text style={styles.sheetFilterLink}>Filters</Text>
-                    </TouchableOpacity>
                 </View>
-
-                <FlatList
-                    data={filteredSpots}
-                    keyExtractor={(item) => item.id.toString()}
-                    renderItem={renderSpotCard}
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.spotList}
-                />
             </Animated.View>
 
-            {/* Filter Modal */}
-            {renderFilterModal()}
+            {/* Price Filter Modal (Native-ish Sheet) */}
+            <Modal visible={showPriceFilter} animationType="fade" transparent>
+                <TouchableOpacity
+                    style={styles.modalBackdrop}
+                    activeOpacity={1}
+                    onPress={() => setShowPriceFilter(false)}
+                >
+                    <View style={styles.filterSheet}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Text style={TYPOGRAPHY.h3}>Max Price</Text>
+                            <Text style={[TYPOGRAPHY.h3, { color: COLORS.secondary }]}>${maxPrice}</Text>
+                        </View>
+
+                        <View style={{ height: 40 }} />
+
+                        <Slider
+                            style={{ width: '100%', height: 40 }}
+                            minimumValue={0}
+                            maximumValue={30}
+                            step={1}
+                            value={maxPrice}
+                            onValueChange={(val) => {
+                                setMaxPrice(val);
+                                if (val % 5 === 0) Haptics.selectionAsync();
+                            }}
+                            minimumTrackTintColor={COLORS.secondary}
+                            maximumTrackTintColor={COLORS.border}
+                            thumbTintColor="white"
+                        />
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 }}>
+                            <Text style={TYPOGRAPHY.caption}>$0</Text>
+                            <Text style={TYPOGRAPHY.caption}>$30+</Text>
+                        </View>
+
+                        <Button title="Done" onPress={() => setShowPriceFilter(false)} style={{ marginTop: SPACING.l }} />
+                    </View>
+                </TouchableOpacity>
+            </Modal>
+            {/* Full Screen Photo Modal */}
+            <Modal visible={showPhotoModal} animationType="fade" transparent={true}>
+                <View style={{ flex: 1, backgroundColor: 'black', justifyContent: 'center' }}>
+                    <TouchableOpacity
+                        style={{ position: 'absolute', top: 50, right: 20, zIndex: 10, padding: 10 }}
+                        onPress={() => setShowPhotoModal(false)}
+                    >
+                        <Text style={{ color: 'white', fontSize: 30 }}>✕</Text>
+                    </TouchableOpacity>
+                    {selectedSpot?.photo_url && (
+                        <Image
+                            source={{ uri: selectedSpot.photo_url }}
+                            style={{ width: '100%', height: '80%', resizeMode: 'contain' }}
+                        />
+                    )}
+                </View>
+            </Modal>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#f8f9fa',
-    },
-    fullMap: {
-        flex: 1,
-    },
-    mapLoading: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#f0f0f0',
-    },
-    mapLoadingText: {
-        marginTop: 10,
-        color: '#666',
+    container: { flex: 1, backgroundColor: COLORS.background },
+    topContainer: { margin: SPACING.m, zIndex: 10 },
+    filterRow: { flexDirection: 'row', marginTop: SPACING.s, alignItems: 'center' },
+    refreshBadge: {
+        backgroundColor: COLORS.card,
+        padding: 8,
+        borderRadius: RADIUS.round,
+        ...SHADOWS.small,
+        marginLeft: SPACING.s
     },
 
     // Search Overlay
     searchOverlay: {
-        position: 'absolute',
-        top: 60,
-        left: 0,
-        right: 0,
-        paddingHorizontal: 16,
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: COLORS.background,
+        zIndex: 20,
     },
-    searchBar: {
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
-        elevation: 5,
-    },
-    searchInput: {
-        padding: 16,
-        fontSize: 16,
-        color: '#333',
-    },
-    suggestionsDropdown: {
-        borderTopWidth: 1,
-        borderTopColor: '#eee',
-        maxHeight: 200,
-    },
-    suggestionItem: {
-        padding: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#f0f0f0',
-    },
-    suggestionText: {
-        fontSize: 14,
-        color: '#333',
-    },
-
-    // Filter Chips
-    filterChips: {
+    searchHeader: {
         flexDirection: 'row',
-        marginTop: 10,
-        gap: 8,
-    },
-    filterChip: {
-        backgroundColor: '#fff',
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        borderRadius: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
-        elevation: 2,
-    },
-    filterChipRefresh: {
-        backgroundColor: '#fff',
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
-        elevation: 2,
-    },
-    filterChipText: {
-        fontSize: 13,
-        color: '#333',
-        fontWeight: '500',
-    },
-
-    // Find Button
-    findButton: {
-        backgroundColor: '#007AFF',
-        padding: 16,
-        borderRadius: 12,
-        marginTop: 12,
         alignItems: 'center',
-        shadowColor: '#007AFF',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 5,
+        padding: SPACING.m,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
     },
-    findButtonDisabled: {
-        opacity: 0.7,
+    searchInputContainer: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.card,
+        height: 40,
+        borderRadius: RADIUS.s,
+        paddingHorizontal: SPACING.s,
     },
-    findButtonText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: '600',
+    searchInput: { flex: 1, marginLeft: SPACING.s, ...TYPOGRAPHY.body, fontSize: 16 },
+    searchIcon: { opacity: 0.5 },
+    suggestionItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: SPACING.l,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: COLORS.border,
     },
+    pinIcon: { width: 30, alignItems: 'center', marginRight: SPACING.s },
 
     // Bottom Sheet
     bottomSheet: {
         position: 'absolute',
-        bottom: 0,
         left: 0,
         right: 0,
-        backgroundColor: '#fff',
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -3 },
-        shadowOpacity: 0.15,
-        shadowRadius: 10,
-        elevation: 10,
+        bottom: 0,
+        backgroundColor: COLORS.card,
+        borderTopLeftRadius: RADIUS.xl,
+        borderTopRightRadius: RADIUS.xl,
+        ...SHADOWS.large,
+        height: SCREEN_HEIGHT,
     },
-    sheetHandle: {
-        alignItems: 'center',
-        paddingVertical: 12,
-    },
-    handleBar: {
-        width: 40,
-        height: 4,
-        backgroundColor: '#ddd',
-        borderRadius: 2,
-    },
+    sheetHandleContainer: { height: 40, alignItems: 'center', paddingTop: SPACING.s },
+    sheetHandle: { width: 40, height: 5, backgroundColor: COLORS.border, borderRadius: 100 },
     sheetHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 16,
-        marginBottom: 10,
+        marginTop: SPACING.s,
+        paddingHorizontal: SPACING.m,
+        width: '100%',
     },
-    sheetTitle: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#333',
-    },
-    sheetFilterLink: {
-        fontSize: 14,
-        color: '#007AFF',
-        fontWeight: '500',
-    },
+    sheetContent: { flex: 1 },
 
-    // Spot Cards
-    spotList: {
-        paddingHorizontal: 16,
-        paddingBottom: 20,
-    },
-    spotCard: {
-        width: 200,
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 14,
-        marginRight: 12,
-        borderWidth: 2,
-        borderColor: '#f0f0f0',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 4,
-        elevation: 3,
-    },
-    spotCardSelected: {
-        borderColor: '#007AFF',
-    },
-    spotCardHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 8,
-    },
-    pricePill: {
-        backgroundColor: '#34C759',
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 12,
-    },
-    priceText: {
-        color: '#fff',
-        fontSize: 14,
-        fontWeight: '700',
-    },
-    spotMeta: {
-        alignItems: 'flex-end',
-    },
-    spotType: {
-        fontSize: 11,
-        color: '#666',
-    },
-    spotTime: {
-        fontSize: 10,
-        color: '#999',
-    },
-    spotAddress: {
-        fontSize: 13,
-        color: '#333',
-        marginBottom: 8,
-    },
-    spotCardFooter: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    spotDistance: {
-        fontSize: 12,
-        color: '#666',
-    },
-    navigateButton: {
-        backgroundColor: '#007AFF',
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        borderRadius: 6,
-    },
-    navigateButtonText: {
-        color: '#fff',
-        fontSize: 11,
-        fontWeight: '600',
-    },
-    photoIndicator: {
-        position: 'absolute',
-        top: 8,
-        right: 8,
-    },
-    photoIndicatorText: {
-        fontSize: 14,
-    },
+    // Spot
+    spotCard: { marginBottom: SPACING.s },
+    thumb: { width: 50, height: 50, borderRadius: RADIUS.s, backgroundColor: COLORS.background },
+    fullImage: { width: '100%', height: 200, borderRadius: RADIUS.m, marginTop: SPACING.m },
 
     // Filter Modal
-    modalOverlay: {
+    modalBackdrop: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
+        backgroundColor: 'rgba(0,0,0,0.4)',
         justifyContent: 'flex-end',
     },
-    filterModalContent: {
-        backgroundColor: '#fff',
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        padding: 24,
+    filterSheet: {
+        backgroundColor: COLORS.card,
+        padding: SPACING.xl,
+        borderTopLeftRadius: RADIUS.xl,
+        borderTopRightRadius: RADIUS.xl,
         paddingBottom: 40,
     },
-    filterModalTitle: {
-        fontSize: 20,
-        fontWeight: '700',
-        textAlign: 'center',
-        marginBottom: 24,
-    },
-    filterSection: {
-        marginBottom: 24,
-    },
-    filterLabel: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#333',
-        marginBottom: 12,
-    },
-    sliderTrack: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 8,
-    },
-    priceChip: {
-        backgroundColor: '#f0f0f0',
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderRadius: 20,
-    },
-    priceChipSelected: {
-        backgroundColor: '#007AFF',
-    },
-    priceChipText: {
-        fontSize: 14,
-        color: '#333',
-        fontWeight: '500',
-    },
-    priceChipTextSelected: {
-        color: '#fff',
-    },
-    filterDoneButton: {
-        backgroundColor: '#007AFF',
-        padding: 16,
-        borderRadius: 12,
-        alignItems: 'center',
-    },
-    filterDoneButtonText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: '600',
-    },
-
-    // Match View
-    matchContainer: {
-        flex: 1,
-        padding: 16,
-    },
-    matchHeader: {
+    sliderRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 16,
+        marginTop: SPACING.m,
     },
-    matchTitle: {
-        fontSize: 24,
-        fontWeight: '700',
+    priceStep: {
+        padding: 10,
+        backgroundColor: COLORS.background,
+        borderRadius: RADIUS.m,
+        ...SHADOWS.small
     },
-    timerBadge: {
-        backgroundColor: '#FF9500',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 16,
-    },
-    timerText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: '700',
-    },
-    matchMap: {
-        height: 200,
-        borderRadius: 12,
-        marginBottom: 16,
-    },
-    matchDetails: {
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 16,
-    },
-    matchPricePill: {
-        backgroundColor: '#34C759',
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 16,
-        alignSelf: 'flex-start',
-        marginBottom: 12,
-    },
-    matchPriceText: {
-        color: '#fff',
-        fontSize: 20,
-        fontWeight: '700',
-    },
-    matchAddress: {
-        fontSize: 16,
-        color: '#333',
-        marginBottom: 4,
-    },
-    matchDistance: {
-        fontSize: 14,
-        color: '#666',
-    },
-    photoPreview: {
-        marginTop: 12,
-    },
-    photoThumbnail: {
-        width: '100%',
-        height: 120,
-        borderRadius: 8,
-    },
-    viewPhotoText: {
-        fontSize: 12,
-        color: '#007AFF',
-        textAlign: 'center',
-        marginTop: 4,
-    },
-    matchActions: {
-        marginBottom: 16,
-    },
-    navigateFullButton: {
-        backgroundColor: '#007AFF',
-        padding: 16,
-        borderRadius: 12,
-        alignItems: 'center',
-    },
-    navigateFullButtonText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    verifyActions: {
-        flexDirection: 'row',
-        gap: 12,
-    },
-    verifyButton: {
-        flex: 1,
-        padding: 16,
-        borderRadius: 12,
-        alignItems: 'center',
-    },
-    verifyFoundButton: {
-        backgroundColor: '#34C759',
-    },
-    verifyNotFoundButton: {
-        backgroundColor: '#f0f0f0',
-    },
-    verifyButtonText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    verifyNotFoundText: {
-        color: '#333',
-        fontSize: 16,
-        fontWeight: '600',
-    },
-
-    // Photo Modal
-    photoModalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.9)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    photoModalClose: {
-        position: 'absolute',
-        top: 60,
-        right: 20,
-        zIndex: 10,
-    },
-    photoModalCloseText: {
-        color: '#fff',
-        fontSize: 16,
-    },
-    photoModalImage: {
-        width: '100%',
-        height: '70%',
-    },
+    priceStepText: { fontWeight: '600' },
+    priceStepSelected: { backgroundColor: COLORS.primary }
 });

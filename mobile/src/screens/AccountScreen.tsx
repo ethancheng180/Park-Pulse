@@ -1,428 +1,287 @@
 /**
- * Account Tab - User profile, balance, reputation, and history
+ * Account Screen - iOS Grouped List Style
+ * Updates:
+ * - Wallet & Payment Section (Apple Pay + Cards)
+ * - Local Mock State for Cards
  */
 import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
-    TouchableOpacity,
     StyleSheet,
     ScrollView,
-    FlatList,
-    ActivityIndicator,
+    TouchableOpacity,
+    SafeAreaView,
+    Switch,
+    Alert,
+    Modal
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { userAPI, authAPI } from '../services/api';
-import { User, HistoryItem } from '../types';
+import { User } from '../types';
+import { COLORS, SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../theme';
+import { Button, Card } from '../components/Shared';
 
-interface AccountScreenProps {
-    onLogout: () => void;
+interface Props { onLogout: () => void; }
+
+interface PaymentMethod {
+    id: string;
+    type: 'visa' | 'mastercard' | 'amex';
+    last4: string;
+    isDefault: boolean;
 }
 
-export default function AccountScreen({ onLogout }: AccountScreenProps) {
+export default function AccountScreen({ onLogout }: Props) {
     const [user, setUser] = useState<User | null>(null);
-    const [history, setHistory] = useState<HistoryItem[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [refreshing, setRefreshing] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [applePayEnabled, setApplePayEnabled] = useState(true);
+    const [cards, setCards] = useState<PaymentMethod[]>([
+        { id: '1', type: 'visa', last4: '4242', isDefault: true }
+    ]);
+    const [showAddCard, setShowAddCard] = useState(false);
 
     useEffect(() => {
-        loadData();
+        userAPI.getMe().then(setUser).catch(console.error);
     }, []);
 
-    const loadData = async () => {
-        setRefreshing(true);
-        setError(null);
-        try {
-            console.log('📱 AccountScreen: Loading user profile...');
-            const [userData, historyData] = await Promise.all([
-                userAPI.getMe(),
-                userAPI.getHistory(),
-            ]);
-            console.log('✅ AccountScreen: Profile loaded successfully:', userData.email);
-            setUser(userData);
-            setHistory(historyData);
-        } catch (err: any) {
-            console.error('❌ AccountScreen: Error loading profile:', err);
-            console.error('❌ Error details:', {
-                message: err.message,
-                response: err.response?.data,
-                status: err.response?.status,
-            });
-            setError(err.response?.data?.detail || err.message || 'Failed to load profile');
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
-        }
+    const handleLogout = () => {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        Alert.alert('Log Out', 'Are you sure?', [
+            { text: 'Cancel', style: 'cancel' },
+            {
+                text: 'Log Out', style: 'destructive', onPress: () => {
+                    authAPI.logout();
+                    onLogout();
+                }
+            }
+        ]);
     };
 
-    const handleLogout = async () => {
-        await authAPI.logout();
-        onLogout();
-    };
-
-    const renderStars = (rating: number) => {
-        const stars = [];
-        for (let i = 1; i <= 5; i++) {
-            stars.push(
-                <Text key={i} style={styles.star}>
-                    {i <= rating ? '★' : '☆'}
-                </Text>
-            );
-        }
-        return stars;
-    };
-
-    const renderHistoryItem = ({ item }: { item: HistoryItem }) => {
-        const icons: Record<string, string> = {
-            spot: '📍',
-            request: '🚗',
-            payout: '💰',
+    const handleAddCard = () => {
+        // Mock API Call
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        const newCard: PaymentMethod = {
+            id: Date.now().toString(),
+            type: 'mastercard',
+            last4: Math.floor(1000 + Math.random() * 9000).toString(),
+            isDefault: false
         };
-
-        return (
-            <View style={styles.historyCard}>
-                <View style={styles.historyHeader}>
-                    <Text style={styles.historyIcon}>{icons[item.type]}</Text>
-                    <View style={styles.historyContent}>
-                        <Text style={styles.historyType}>{item.type.toUpperCase()}</Text>
-                        <Text style={styles.historyDate}>
-                            {new Date(item.created_at).toLocaleString()}
-                        </Text>
-                    </View>
-                    <View style={styles.historyRight}>
-                        {item.amount && (
-                            <Text style={styles.historyAmount}>
-                                ${Number(item.amount).toFixed(2)}
-                            </Text>
-                        )}
-                        <View
-                            style={[
-                                styles.historyStatusBadge,
-                                item.status === 'verified' && styles.statusSuccess,
-                                item.status === 'failed' && styles.statusFailed,
-                            ]}
-                        >
-                            <Text style={styles.historyStatusText}>{item.status}</Text>
-                        </View>
-                    </View>
-                </View>
-            </View>
-        );
+        setCards([...cards, newCard]);
+        setShowAddCard(false);
+        Alert.alert('Success', `Mastercard •••• ${newCard.last4} added successfully.`);
     };
 
-    if (loading) {
-        return (
-            <View style={[styles.container, styles.centered]}>
-                <ActivityIndicator size="large" color="#007AFF" />
-            </View>
-        );
-    }
+    const handleDeleteCard = (id: string) => {
+        Alert.alert('Remove Card', 'Are you sure?', [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Remove', style: 'destructive', onPress: () => setCards(cards.filter(c => c.id !== id)) }
+        ]);
+    };
 
-    if (!user) {
-        return (
-            <View style={[styles.container, styles.centered]}>
-                <Text style={styles.errorIcon}>⚠️</Text>
-                <Text style={styles.errorTitle}>Error loading profile</Text>
-                <Text style={styles.errorMessage}>{error || 'Unknown error occurred'}</Text>
-                <TouchableOpacity style={styles.retryButton} onPress={loadData}>
-                    <Text style={styles.retryButtonText}>🔄 Retry</Text>
-                </TouchableOpacity>
+    // iOS Grouped Section Component
+    const Section = ({ title, children }: { title?: string, children: React.ReactNode }) => (
+        <View style={styles.sectionContainer}>
+            {title && <Text style={styles.sectionHeader}>{title.toUpperCase()}</Text>}
+            <View style={styles.sectionBody}>
+                {children}
             </View>
-        );
-    }
+        </View>
+    );
+
+    // iOS List Row Component
+    const Row = ({ label, value, isLast, onPress, destructive, icon }: any) => (
+        <TouchableOpacity
+            style={[styles.row, !isLast && styles.rowBorder]}
+            onPress={onPress}
+            activeOpacity={onPress ? 0.7 : 1}
+            disabled={!onPress}
+        >
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                {icon && <Text style={{ marginRight: 10, fontSize: 16 }}>{icon}</Text>}
+                <Text style={[styles.rowLabel, destructive && { color: COLORS.error }]}>{label}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                {value && <Text style={styles.rowValue}>{value}</Text>}
+                {onPress && <Text style={styles.chevron}>›</Text>}
+            </View>
+        </TouchableOpacity>
+    );
 
     return (
-        <View style={styles.container}>
-            <ScrollView>
-                <View style={styles.profileSection}>
-                    <Text style={styles.email}>{user.email}</Text>
-                    <View style={styles.roleBadge}>
-                        <Text style={styles.roleText}>{user.role.toUpperCase()}</Text>
-                    </View>
-                </View>
+        <SafeAreaView style={styles.container}>
+            <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+                <Text style={styles.screenTitle}>Settings</Text>
 
-                <View style={styles.statsContainer}>
-                    <View style={styles.statCard}>
-                        <Text style={styles.statLabel}>Balance</Text>
-                        <Text style={styles.statValue}>${Number(user.balance).toFixed(2)}</Text>
-                    </View>
-
-                    {user.reputation && (
-                        <View style={styles.statCard}>
-                            <Text style={styles.statLabel}>Reputation</Text>
-                            <View style={styles.starsContainer}>
-                                {renderStars(Math.round(Number(user.reputation.rating)))}
+                {/* Profile Section */}
+                {user && (
+                    <Section title="Profile">
+                        <View style={styles.profileRow}>
+                            <View style={styles.avatar}>
+                                <Text style={{ fontSize: 24 }}>👤</Text>
                             </View>
-                            <Text style={styles.ratingValue}>{Number(user.reputation.rating).toFixed(1)}</Text>
-                        </View>
-                    )}
-                </View>
-
-                {user.reputation && (
-                    <View style={styles.reputationDetails}>
-                        <Text style={styles.sectionTitle}>Performance</Text>
-                        <View style={styles.reputationGrid}>
-                            <View style={styles.reputationStat}>
-                                <Text style={styles.reputationNumber}>
-                                    {user.reputation.successful_reports}
-                                </Text>
-                                <Text style={styles.reputationLabel}>Successful</Text>
-                            </View>
-                            <View style={styles.reputationStat}>
-                                <Text style={[styles.reputationNumber, styles.failedNumber]}>
-                                    {user.reputation.failed_reports}
-                                </Text>
-                                <Text style={styles.reputationLabel}>Failed</Text>
-                            </View>
-                            <View style={styles.reputationStat}>
-                                <Text style={styles.reputationNumber}>
-                                    ${Number(user.reputation.total_earnings).toFixed(0)}
-                                </Text>
-                                <Text style={styles.reputationLabel}>Total Earned</Text>
+                            <View>
+                                <Text style={TYPOGRAPHY.h3}>{user.email}</Text>
+                                <Text style={TYPOGRAPHY.caption}>{user.role.toUpperCase()}</Text>
                             </View>
                         </View>
-                    </View>
+                    </Section>
                 )}
 
-                <View style={styles.historySection}>
-                    <View style={styles.historyHeader}>
-                        <Text style={styles.sectionTitle}>Transaction History</Text>
-                        <TouchableOpacity onPress={loadData}>
-                            <Text style={styles.refreshText}>Refresh</Text>
-                        </TouchableOpacity>
-                    </View>
-                    <FlatList
-                        data={history}
-                        keyExtractor={(item, index) => `${item.id}-${item.type}-${index}`}
-                        renderItem={renderHistoryItem}
-                        scrollEnabled={false}
-                        ListEmptyComponent={
-                            <Text style={styles.emptyText}>No transactions yet</Text>
-                        }
-                    />
-                </View>
+                {/* Stats Section */}
+                <Section title="Reputation">
+                    <Row label="Rating" value={`★ ${Number(user?.reputation?.rating || 5.0).toFixed(2)}`} />
+                    <Row label="Reports" value={user?.reputation?.successful_reports || 0} />
+                    <Row label="Member Since" value="2024" isLast />
+                </Section>
 
-                <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-                    <Text style={styles.logoutText}>Logout</Text>
-                </TouchableOpacity>
+                {/* Wallet Section */}
+                <Section title="Wallet & Payment">
+                    <TouchableOpacity
+                        style={[styles.row, styles.rowBorder]}
+                        activeOpacity={1}
+                    >
+                        <Text style={styles.rowLabel}>Apple Pay</Text>
+                        <Switch
+                            value={applePayEnabled}
+                            onValueChange={setApplePayEnabled}
+                            trackColor={{ false: COLORS.border, true: COLORS.success }}
+                        />
+                    </TouchableOpacity>
+
+                    {cards.map((card, index) => (
+                        <Row
+                            key={card.id}
+                            icon="💳"
+                            label={`${card.type.toUpperCase()} •••• ${card.last4}`}
+                            value={card.isDefault ? 'Default' : ''}
+                            onPress={() => handleDeleteCard(card.id)}
+                            isLast={index === cards.length - 1 && !showAddCard}
+                        />
+                    ))}
+
+                    <Row
+                        label="Add Payment Method"
+                        onPress={() => setShowAddCard(true)}
+                        isLast
+                        icon="➕"
+                    />
+                </Section>
+
+                {/* Account Section */}
+                <Section title="Account">
+                    <Row label="Balance" value={`$${Number(user?.balance || 0).toFixed(2)}`} onPress={() => { }} />
+                    <Row label="Notifications" isLast onPress={() => { }} />
+                </Section>
+
+                {/* Destructive Section */}
+                <Section>
+                    <Row label="Log Out" destructive isLast onPress={handleLogout} />
+                </Section>
+
+                <Text style={styles.footerText}>ParkPulse v1.1.0 (Build 43)</Text>
             </ScrollView>
-        </View>
+
+            {/* Mock Add Card Modal */}
+            <Modal visible={showAddCard} animationType="slide" presentationStyle="pageSheet">
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalHeader}>
+                        <TouchableOpacity onPress={() => setShowAddCard(false)}>
+                            <Text style={TYPOGRAPHY.body}>Cancel</Text>
+                        </TouchableOpacity>
+                        <Text style={TYPOGRAPHY.h3}>Add Card</Text>
+                        <View style={{ width: 50 }} />
+                    </View>
+                    <View style={{ padding: SPACING.l, alignItems: 'center', marginTop: 50 }}>
+                        <Text style={{ fontSize: 50, marginBottom: SPACING.m }}>💳</Text>
+                        <Text style={TYPOGRAPHY.h2}>Mock Payment</Text>
+                        <Text style={[TYPOGRAPHY.body, { textAlign: 'center', marginVertical: SPACING.m, color: COLORS.text.secondary }]}>
+                            This is a prototype. Tapping "Add Card" will simulate adding a random Mastercard.
+                        </Text>
+                        <Button title="Add Mock Card" onPress={handleAddCard} style={{ width: '100%' }} />
+                    </View>
+                </View>
+            </Modal>
+        </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f5f5f5',
+        backgroundColor: COLORS.background, // iOS Grouped Gray
     },
-    centered: {
-        justifyContent: 'center',
-        alignItems: 'center',
+    screenTitle: {
+        ...TYPOGRAPHY.h1,
+        margin: SPACING.l,
+        marginLeft: SPACING.l + 4,
     },
-    profileSection: {
-        backgroundColor: '#007AFF',
-        padding: 30,
-        alignItems: 'center',
+    sectionContainer: {
+        marginBottom: SPACING.l,
     },
-    email: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#fff',
-        marginBottom: 10,
+    sectionHeader: {
+        ...TYPOGRAPHY.small,
+        marginLeft: SPACING.l + 4,
+        marginBottom: SPACING.s,
+        color: COLORS.text.secondary,
     },
-    roleBadge: {
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        paddingHorizontal: 15,
-        paddingVertical: 6,
-        borderRadius: 15,
+    sectionBody: {
+        backgroundColor: COLORS.card,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderColor: COLORS.border,
     },
-    roleText: {
-        color: '#fff',
-        fontSize: 12,
-        fontWeight: '600',
-    },
-    statsContainer: {
-        flexDirection: 'row',
-        padding: 20,
-        gap: 15,
-    },
-    statCard: {
-        flex: 1,
-        backgroundColor: '#fff',
-        padding: 20,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#eee',
-        alignItems: 'center',
-    },
-    statLabel: {
-        fontSize: 14,
-        color: '#666',
-        marginBottom: 8,
-    },
-    statValue: {
-        fontSize: 28,
-        fontWeight: 'bold',
-        color: '#34C759',
-    },
-    starsContainer: {
-        flexDirection: 'row',
-        marginBottom: 5,
-    },
-    star: {
-        fontSize: 20,
-        color: '#FFD700',
-    },
-    ratingValue: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#333',
-    },
-    reputationDetails: {
-        backgroundColor: '#fff',
-        marginHorizontal: 20,
-        marginBottom: 20,
-        padding: 20,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#eee',
-    },
-    sectionTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 15,
-    },
-    reputationGrid: {
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-    },
-    reputationStat: {
-        alignItems: 'center',
-    },
-    reputationNumber: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#34C759',
-        marginBottom: 5,
-    },
-    failedNumber: {
-        color: '#FF3B30',
-    },
-    reputationLabel: {
-        fontSize: 12,
-        color: '#666',
-    },
-    historySection: {
-        paddingHorizontal: 20,
-        marginBottom: 20,
-    },
-    historyHeader: {
+    row: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 10,
+        padding: SPACING.l,
+        minHeight: 44,
     },
-    refreshText: {
-        color: '#007AFF',
-        fontSize: 14,
+    rowBorder: {
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: COLORS.border,
+        marginLeft: SPACING.l, // Inset separator
     },
-    historyCard: {
-        backgroundColor: '#fff',
-        padding: 15,
-        borderRadius: 10,
-        marginBottom: 10,
-        borderWidth: 1,
-        borderColor: '#eee',
+    rowLabel: {
+        ...TYPOGRAPHY.body,
     },
-    historyIcon: {
-        fontSize: 24,
-        marginRight: 12,
+    rowValue: {
+        ...TYPOGRAPHY.body,
+        color: COLORS.text.secondary,
+        marginRight: SPACING.s,
     },
-    historyContent: {
-        flex: 1,
-    },
-    historyType: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#333',
-        marginBottom: 3,
-    },
-    historyDate: {
-        fontSize: 12,
-        color: '#999',
-    },
-    historyRight: {
-        alignItems: 'flex-end',
-    },
-    historyAmount: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#34C759',
-        marginBottom: 5,
-    },
-    historyStatusBadge: {
-        backgroundColor: '#007AFF',
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        borderRadius: 4,
-    },
-    statusSuccess: {
-        backgroundColor: '#34C759',
-    },
-    statusFailed: {
-        backgroundColor: '#FF3B30',
-    },
-    historyStatusText: {
-        color: '#fff',
-        fontSize: 10,
-        fontWeight: '600',
-    },
-    emptyText: {
-        textAlign: 'center',
-        color: '#999',
-        marginTop: 20,
-        fontSize: 14,
-    },
-    logoutButton: {
-        backgroundColor: '#FF3B30',
-        margin: 20,
-        padding: 18,
-        borderRadius: 10,
-        alignItems: 'center',
-    },
-    logoutText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    // Error state styles
-    errorIcon: {
-        fontSize: 48,
-        marginBottom: 10,
-    },
-    errorTitle: {
+    chevron: {
         fontSize: 18,
-        fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 8,
+        color: COLORS.text.tertiary,
+        marginTop: -2,
     },
-    errorMessage: {
-        fontSize: 14,
-        color: '#666',
+    profileRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: SPACING.l,
+    },
+    avatar: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        backgroundColor: COLORS.background,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: SPACING.m,
+    },
+    footerText: {
         textAlign: 'center',
-        marginBottom: 20,
-        paddingHorizontal: 30,
+        ...TYPOGRAPHY.small,
+        color: COLORS.text.tertiary,
+        marginTop: SPACING.s,
     },
-    retryButton: {
-        backgroundColor: '#007AFF',
-        paddingHorizontal: 30,
-        paddingVertical: 12,
-        borderRadius: 8,
-    },
-    retryButtonText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: '600',
+    modalContainer: { flex: 1, backgroundColor: COLORS.card },
+    modalHeader: {
+        height: 50,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: SPACING.m,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
     },
 });

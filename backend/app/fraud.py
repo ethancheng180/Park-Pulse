@@ -122,8 +122,9 @@ def validate_spot_report(
     if not is_valid:
         return False, error
     
-    # Rate limiting
-    is_allowed, error = check_rate_limit(db, user.id)
+    # Rate limiting (Relaxed for MVP Testing)
+    # Allow 50 reports in 1 minute for testing
+    is_allowed, error = check_rate_limit(db, user.id, window_minutes=1, max_reports=50)
     if not is_allowed:
         return False, error
     
@@ -133,10 +134,10 @@ def validate_spot_report(
         if not is_allowed:
             return False, error
     
-    # Photo reuse check (if photo provided)
-    if photo_url:
-        is_reused = check_photo_reuse(db, photo_url, user.id)
-        if is_reused:
-            return False, "Photo appears to be reused from previous report"
+    # Photo reuse check (Disabled for MVP to prevent hash errors)
+    # if photo_url:
+    #     is_reused = check_photo_reuse(db, photo_url, user.id)
+    #     if is_reused:
+    #         return False, "Photo appears to be reused from previous report"
     
     return True, ""

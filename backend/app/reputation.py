@@ -38,10 +38,49 @@ def update_reputation_after_verification(
     else:
         reputation.failed_reports += 1
         
-        # Decrease rating (min 0.0)
-        # Each failure decreases rating by 0.3
-        new_rating = max(Decimal("0.0"), reputation.rating - Decimal("0.3"))
-        reputation.rating = new_rating
+        # Call penalty systems
+        apply_penalty(db, pulser_id, "false_report")
+
+
+def apply_penalty(db: Session, user_id: int, event_type: str = "false_report"):
+    """
+    Apply penalty to user reputation and user status.
+    
+    Penalties:
+    - false_report: -0.03 rep, +1 strike
+    - minor_infraction: -0.01 rep
+    
+    Ban Threshold: 3 false report strikes
+    """
+    reputation = db.query(Reputation).filter(Reputation.user_id == user_id).first()
+    if not reputation:
+        return
+
+    user = reputation.user
+    
+    if event_type == "false_report":
+        # Heavy penalty
+        penalty = Decimal("0.03")
+        reputation.false_report_strikes += 1
+        
+        # Check ban threshold
+        if reputation.false_report_strikes >= 3:
+            user.banned = True
+            user.ban_reason = "Exceeded false report strike limit (3)."
+            user.appeal_status = "none"
+            
+    elif event_type == "minor_infraction":
+        # Light penalty
+        penalty = Decimal("0.01")
+        
+    else:
+        penalty = Decimal("0.00")
+        
+    # Decrease rating (min 0.0)
+    new_rating = max(Decimal("0.00"), reputation.rating - penalty)
+    reputation.rating = new_rating
+    
+    db.commit()
     
     reputation.last_report_at = datetime.utcnow()
     

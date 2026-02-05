@@ -32,6 +32,7 @@ class ReputationResponse(BaseModel):
     successful_reports: int
     failed_reports: int
     total_earnings: Decimal
+    false_report_strikes: int
     
     model_config = ConfigDict(from_attributes=True)
 
@@ -42,6 +43,9 @@ class UserResponse(BaseModel):
     role: str
     balance: Decimal
     reputation: Optional[ReputationResponse] = None
+    banned: bool = False
+    ban_reason: Optional[str] = None
+    appeal_status: str = "none"
     created_at: datetime
     
     model_config = ConfigDict(from_attributes=True)
@@ -136,6 +140,12 @@ class RefundRequest(BaseModel):
     reason: str
 
 
+
 class BanUserRequest(BaseModel):
     user_id: int
     reason: str
+
+
+class AppealCreate(BaseModel):
+    message: str = Field(min_length=10)
+    attachment_url: Optional[str] = None

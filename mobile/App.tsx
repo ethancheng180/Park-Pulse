@@ -11,6 +11,7 @@ import PulserScreen from './src/screens/PulserScreen';
 import DriverScreen from './src/screens/DriverScreen';
 import AccountScreen from './src/screens/AccountScreen';
 import { authAPI } from './src/services/api';
+import { authEvents } from './src/utils/authEvents';
 
 const Tab = createBottomTabNavigator();
 
@@ -20,6 +21,13 @@ export default function App() {
 
   useEffect(() => {
     checkAuth();
+
+    // Listen for global logout events (e.g. from 401 interceptor)
+    const unsubscribe = authEvents.subscribe(() => {
+      setIsLoggedIn(false);
+    });
+
+    return unsubscribe;
   }, []);
 
   const checkAuth = async () => {

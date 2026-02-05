@@ -4,6 +4,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User, Spot, ParkingRequest, HistoryItem, LoginResponse } from '../types';
+import { authEvents } from '../utils/authEvents';
 
 // Use your computer's IP address instead of localhost for physical devices
 // Fallback logic incase .env loading fails
@@ -69,6 +70,7 @@ api.interceptors.response.use(
             console.log('🔒 Token expired, clearing storage');
             // Token expired, clear storage
             await AsyncStorage.removeItem('access_token');
+            authEvents.emitLogout();
         }
         return Promise.reject(error);
     }
@@ -109,6 +111,11 @@ export const userAPI = {
     async getHistory(): Promise<HistoryItem[]> {
         const response = await api.get<{ items: HistoryItem[] }>('/users/history');
         return response.data.items;
+    },
+
+    async submitAppeal(message: string): Promise<any> {
+        const response = await api.post('/users/appeal', { message });
+        return response.data;
     },
 };
 
