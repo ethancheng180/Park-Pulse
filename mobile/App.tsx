@@ -1,12 +1,15 @@
 /**
- * Main App Component with Tab Navigation
+ * Main App Component with Auth Navigation
  */
 import React, { useState, useEffect } from 'react';
-import { Text } from 'react-native';
+import { Text, View, ActivityIndicator, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
-import LoginScreen from './src/screens/LoginScreen';
+import AuthStartScreen from './src/screens/AuthStartScreen';
+import EmailAuthScreen from './src/screens/EmailAuthScreen';
+import ForgotPasswordScreen from './src/screens/ForgotPasswordScreen';
+import FindAccountScreen from './src/screens/FindAccountScreen';
 import PulserScreen from './src/screens/PulserScreen';
 import DriverScreen from './src/screens/DriverScreen';
 import AccountScreen from './src/screens/AccountScreen';
@@ -15,9 +18,13 @@ import { authEvents } from './src/utils/authEvents';
 
 const Tab = createBottomTabNavigator();
 
+// Auth screens enum
+type AuthScreen = 'start' | 'email' | 'forgot' | 'find';
+
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [authScreen, setAuthScreen] = useState<AuthScreen>('start');
 
   useEffect(() => {
     checkAuth();
@@ -25,6 +32,7 @@ export default function App() {
     // Listen for global logout events (e.g. from 401 interceptor)
     const unsubscribe = authEvents.subscribe(() => {
       setIsLoggedIn(false);
+      setAuthScreen('start');
     });
 
     return unsubscribe;
@@ -38,25 +46,64 @@ export default function App() {
 
   const handleLogin = () => {
     setIsLoggedIn(true);
+    setAuthScreen('start');
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await authAPI.logout();
     setIsLoggedIn(false);
+    setAuthScreen('start');
   };
 
+  // Loading splash
   if (isLoading) {
-    return null; // Could add a splash screen here
+    return (
+      <View style={styles.splashContainer}>
+        <StatusBar style="dark" />
+        <View style={styles.splashIcon}>
+          <Text style={styles.splashIconText}>P</Text>
+        </View>
+        <Text style={styles.splashTitle}>ParkPulse</Text>
+        <ActivityIndicator size="small" color="#000" style={styles.splashLoader} />
+      </View>
+    );
   }
 
+  // Auth flow (not logged in)
   if (!isLoggedIn) {
     return (
       <>
         <StatusBar style="dark" />
-        <LoginScreen onLogin={handleLogin} />
+        {authScreen === 'start' && (
+          <AuthStartScreen
+            onLogin={handleLogin}
+            onNavigateToEmail={() => setAuthScreen('email')}
+            onNavigateToFindAccount={() => setAuthScreen('find')}
+          />
+        )}
+        {authScreen === 'email' && (
+          <EmailAuthScreen
+            onLogin={handleLogin}
+            onBack={() => setAuthScreen('start')}
+            onNavigateToForgotPassword={() => setAuthScreen('forgot')}
+          />
+        )}
+        {authScreen === 'forgot' && (
+          <ForgotPasswordScreen
+            onBack={() => setAuthScreen('email')}
+          />
+        )}
+        {authScreen === 'find' && (
+          <FindAccountScreen
+            onBack={() => setAuthScreen('start')}
+            onNavigateToEmail={() => setAuthScreen('email')}
+          />
+        )}
       </>
     );
   }
 
+  // Main app (logged in)
   return (
     <>
       <StatusBar style="dark" />
@@ -64,14 +111,20 @@ export default function App() {
         <Tab.Navigator
           screenOptions={{
             headerStyle: {
-              backgroundColor: '#007AFF',
+              backgroundColor: '#FFFFFF',
+              shadowColor: 'transparent',
+              elevation: 0,
             },
-            headerTintColor: '#fff',
+            headerTintColor: '#000',
             headerTitleStyle: {
-              fontWeight: 'bold',
+              fontWeight: '600',
             },
-            tabBarActiveTintColor: '#007AFF',
-            tabBarInactiveTintColor: '#8E8E93',
+            tabBarActiveTintColor: '#000000',
+            tabBarInactiveTintColor: '#9CA3AF',
+            tabBarStyle: {
+              backgroundColor: '#FFFFFF',
+              borderTopColor: '#E5E7EB',
+            },
           }}
         >
           <Tab.Screen
@@ -104,3 +157,35 @@ export default function App() {
     </>
   );
 }
+
+const styles = StyleSheet.create({
+  splashContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  splashIcon: {
+    width: 80,
+    height: 80,
+    backgroundColor: '#000000',
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  splashIconText: {
+    color: '#FFFFFF',
+    fontSize: 40,
+    fontWeight: 'bold',
+  },
+  splashTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#000000',
+    letterSpacing: -0.5,
+  },
+  splashLoader: {
+    marginTop: 24,
+  },
+});

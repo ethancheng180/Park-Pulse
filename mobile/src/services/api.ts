@@ -99,6 +99,25 @@ export const authAPI = {
     async getToken(): Promise<string | null> {
         return await AsyncStorage.getItem('access_token');
     },
+
+    async requestPasswordReset(email: string): Promise<void> {
+        await api.post('/auth/password-reset-request', { email });
+    },
+
+    async findAccount(identifier: string): Promise<{ found: boolean; recovery_method?: string }> {
+        const response = await api.post<{ found: boolean; recovery_method?: string }>(
+            '/auth/find-account',
+            { identifier }
+        );
+        return response.data;
+    },
+
+    async loginWithGoogle(idToken: string): Promise<string> {
+        const response = await api.post<LoginResponse>('/auth/google', { idToken });
+        const token = response.data.access_token;
+        await AsyncStorage.setItem('access_token', token);
+        return token;
+    },
 };
 
 // User API

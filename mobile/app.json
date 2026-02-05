@@ -2,6 +2,7 @@
   "expo": {
     "name": "ParkPulse",
     "slug": "parkpulse",
+    "scheme": "parkpulse",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -61,7 +62,8 @@
           "photosPermission": "The app needs access to your photos to upload parking spot images.",
           "cameraPermission": "The app needs camera access to take photos of parking spots."
         }
-      ]
+      ],
+      "expo-web-browser"
     ]
   }
 }
