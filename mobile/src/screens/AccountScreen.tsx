@@ -23,6 +23,7 @@ export default function AccountScreen({ onLogout }: AccountScreenProps) {
     const [history, setHistory] = useState<HistoryItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         loadData();
@@ -30,15 +31,24 @@ export default function AccountScreen({ onLogout }: AccountScreenProps) {
 
     const loadData = async () => {
         setRefreshing(true);
+        setError(null);
         try {
+            console.log('📱 AccountScreen: Loading user profile...');
             const [userData, historyData] = await Promise.all([
                 userAPI.getMe(),
                 userAPI.getHistory(),
             ]);
+            console.log('✅ AccountScreen: Profile loaded successfully:', userData.email);
             setUser(userData);
             setHistory(historyData);
-        } catch (error) {
-            console.error('Error loading data:', error);
+        } catch (err: any) {
+            console.error('❌ AccountScreen: Error loading profile:', err);
+            console.error('❌ Error details:', {
+                message: err.message,
+                response: err.response?.data,
+                status: err.response?.status,
+            });
+            setError(err.response?.data?.detail || err.message || 'Failed to load profile');
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -111,7 +121,12 @@ export default function AccountScreen({ onLogout }: AccountScreenProps) {
     if (!user) {
         return (
             <View style={[styles.container, styles.centered]}>
-                <Text>Error loading profile</Text>
+                <Text style={styles.errorIcon}>⚠️</Text>
+                <Text style={styles.errorTitle}>Error loading profile</Text>
+                <Text style={styles.errorMessage}>{error || 'Unknown error occurred'}</Text>
+                <TouchableOpacity style={styles.retryButton} onPress={loadData}>
+                    <Text style={styles.retryButtonText}>🔄 Retry</Text>
+                </TouchableOpacity>
             </View>
         );
     }
@@ -380,5 +395,34 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 16,
         fontWeight: 'bold',
+    },
+    // Error state styles
+    errorIcon: {
+        fontSize: 48,
+        marginBottom: 10,
+    },
+    errorTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#333',
+        marginBottom: 8,
+    },
+    errorMessage: {
+        fontSize: 14,
+        color: '#666',
+        textAlign: 'center',
+        marginBottom: 20,
+        paddingHorizontal: 30,
+    },
+    retryButton: {
+        backgroundColor: '#007AFF',
+        paddingHorizontal: 30,
+        paddingVertical: 12,
+        borderRadius: 8,
+    },
+    retryButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '600',
     },
 });
