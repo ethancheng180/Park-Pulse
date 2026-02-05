@@ -12,6 +12,9 @@ import {
     ActivityIndicator,
     Platform,
     FlatList,
+    Image,
+    ScrollView,
+    Modal,
 } from 'react-native';
 import { locationService } from '../services/location';
 import { requestAPI } from '../services/api';
@@ -30,6 +33,7 @@ export default function DriverScreen() {
     const [userLocation, setUserLocation] = useState<Location | null>(null);
     const [suggestions, setSuggestions] = useState<string[]>([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
+    const [showPhotoModal, setShowPhotoModal] = useState(false);
 
     useEffect(() => {
         getCurrentLocation();
@@ -273,6 +277,25 @@ export default function DriverScreen() {
                             Distance: {Math.round(match.distance_meters)}m • Price: ${match.amount}
                         </Text>
 
+                        {/* Photo Proof Section */}
+                        {match.spot.photo_url ? (
+                            <View style={styles.photoProofSection}>
+                                <Text style={styles.photoProofLabel}>📸 Photo Proof from Pulser</Text>
+                                <TouchableOpacity onPress={() => setShowPhotoModal(true)}>
+                                    <Image
+                                        source={{ uri: match.spot.photo_url }}
+                                        style={styles.photoProofThumbnail}
+                                        resizeMode="cover"
+                                    />
+                                    <Text style={styles.tapToEnlarge}>Tap to enlarge</Text>
+                                </TouchableOpacity>
+                            </View>
+                        ) : (
+                            <View style={styles.noPhotoSection}>
+                                <Text style={styles.noPhotoText}>📷 No photo provided</Text>
+                            </View>
+                        )}
+
                         <Text style={styles.confirmLabel}>Did you find the spot?</Text>
 
                         <View style={styles.confirmButtons}>
@@ -290,6 +313,29 @@ export default function DriverScreen() {
                             </TouchableOpacity>
                         </View>
                     </View>
+
+                    {/* Full Screen Photo Modal */}
+                    <Modal
+                        visible={showPhotoModal}
+                        transparent={true}
+                        animationType="fade"
+                        onRequestClose={() => setShowPhotoModal(false)}
+                    >
+                        <TouchableOpacity
+                            style={styles.photoModalOverlay}
+                            activeOpacity={1}
+                            onPress={() => setShowPhotoModal(false)}
+                        >
+                            <View style={styles.photoModalContent}>
+                                <Image
+                                    source={{ uri: match.spot.photo_url || '' }}
+                                    style={styles.photoModalImage}
+                                    resizeMode="contain"
+                                />
+                                <Text style={styles.photoModalClose}>Tap anywhere to close</Text>
+                            </View>
+                        </TouchableOpacity>
+                    </Modal>
                 </View>
             )
             }
@@ -475,5 +521,66 @@ const styles = StyleSheet.create({
     suggestionText: {
         fontSize: 14,
         color: '#333',
+    },
+    // Photo Proof Styles
+    photoProofSection: {
+        marginVertical: 15,
+        padding: 10,
+        backgroundColor: '#f8f9fa',
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#e9ecef',
+    },
+    photoProofLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#495057',
+        marginBottom: 10,
+    },
+    photoProofThumbnail: {
+        width: '100%',
+        height: 180,
+        borderRadius: 8,
+        backgroundColor: '#dee2e6',
+    },
+    tapToEnlarge: {
+        fontSize: 12,
+        color: '#6c757d',
+        textAlign: 'center',
+        marginTop: 5,
+    },
+    noPhotoSection: {
+        marginVertical: 15,
+        padding: 15,
+        backgroundColor: '#f8f9fa',
+        borderRadius: 10,
+        alignItems: 'center',
+    },
+    noPhotoText: {
+        fontSize: 14,
+        color: '#6c757d',
+    },
+    photoModalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.9)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    photoModalContent: {
+        width: '100%',
+        height: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    photoModalImage: {
+        width: '100%',
+        height: '80%',
+    },
+    photoModalClose: {
+        color: '#fff',
+        fontSize: 14,
+        marginTop: 20,
+        opacity: 0.7,
     },
 });
