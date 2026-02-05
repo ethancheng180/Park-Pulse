@@ -1,5 +1,5 @@
 /**
- * Pulser Tab - Report parking spots
+ * Pulser Tab - Report parking spots with improved photo UX
  */
 import React, { useState, useEffect } from 'react';
 import {
@@ -10,8 +10,11 @@ import {
     FlatList,
     Alert,
     ActivityIndicator,
+    Image,
+    Modal,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import { locationService } from '../services/location';
 import { spotAPI } from '../services/api';
 import { Spot, Location } from '../types';
@@ -35,6 +38,11 @@ export default function PulserScreen() {
     });
     const [reportingAddress, setReportingAddress] = useState('Loading address...');
 
+    // Photo state
+    const [photoUri, setPhotoUri] = useState<string | null>(null);
+    const [showPhotoPreview, setShowPhotoPreview] = useState(false);
+    const [permissionDenied, setPermissionDenied] = useState(false);
+
     useEffect(() => {
         loadSpots();
         requestPermissions();
@@ -42,8 +50,15 @@ export default function PulserScreen() {
 
     const requestPermissions = async () => {
         await locationService.requestPermission();
-        await ImagePicker.requestCameraPermissionsAsync();
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+        const cameraResult = await ImagePicker.requestCameraPermissionsAsync();
+        const mediaResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+        if (cameraResult.status !== 'granted' || mediaResult.status !== 'granted') {
+            setPermissionDenied(true);
+        } else {
+            setPermissionDenied(false);
+        }
     };
 
     const loadSpots = async () => {
@@ -59,7 +74,10 @@ export default function PulserScreen() {
     };
 
     const startReporting = async () => {
+        // Reset photo state for new report
+        setPhotoUri(null);
         setLoading(true);
+
         try {
             const location = await locationService.getCurrentLocation();
             setReportingLocation(location);
@@ -85,13 +103,6 @@ export default function PulserScreen() {
         }
     };
 
-    const handleRegionChange = async (region: any) => {
-        // Update reporting location center
-        // Debounce this in production, but direct set for now
-        // We only update the address on confirming or with a debounce 
-        // effectively handled by the user stopping dragging
-    };
-
     const handleRegionChangeComplete = async (region: any) => {
         setReportingLocation({
             latitude: region.latitude,
@@ -106,7 +117,90 @@ export default function PulserScreen() {
         setReportingAddress(address);
     };
 
-    const confirmSpotLocation = async () => {
+    // Photo capture with local storage
+    const capturePhoto = async () => {
+        if (permissionDenied) {
+            Alert.alert(
+                'Camera Permission Required',
+                'Please enable camera access in your device settings to take photos.',
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                        text: 'Open Settings', onPress: () => {
+                            // On iOS this would open settings, but for now just alert
+                            Alert.alert('Go to Settings > ParkPulse > Camera');
+                        }
+                    }
+                ]
+            );
+            return;
+        }
+
+        try {
+            const result = await ImagePicker.launchCameraAsync({
+                allowsEditing: true,
+                quality: 0.7,
+                aspect: [4, 3],
+            });
+
+            if (!result.canceled && result.assets[0]) {
+                const tempUri = result.assets[0].uri;
+
+                // Save to permanent local storage
+                const savedUri = await savePhotoToStorage(tempUri);
+
+                if (savedUri) {
+                    setPhotoUri(savedUri);
+                    console.log('📸 Photo saved:', savedUri);
+                } else {
+                    Alert.alert('Error', 'Failed to save photo. Please try again.');
+                }
+            }
+        } catch (error) {
+            console.error('Error capturing photo:', error);
+            Alert.alert('Error', 'Failed to capture photo. Please try again.');
+        }
+    };
+
+    // Save photo to local storage for persistence
+    const savePhotoToStorage = async (tempUri: string): Promise<string | null> => {
+        try {
+            const fileName = `spot_photo_${Date.now()}.jpg`;
+            const destinationUri = `${FileSystem.documentDirectory}${fileName}`;
+
+            await FileSystem.copyAsync({
+                from: tempUri,
+                to: destinationUri,
+            });
+
+            return destinationUri;
+        } catch (error) {
+            console.error('Error saving photo:', error);
+            return null;
+        }
+    };
+
+    // Retake photo (delete old, capture new)
+    const retakePhoto = async () => {
+        // Delete old photo if exists
+        if (photoUri) {
+            try {
+                await FileSystem.deleteAsync(photoUri, { idempotent: true });
+            } catch (error) {
+                console.error('Error deleting old photo:', error);
+            }
+        }
+
+        setShowPhotoPreview(false);
+        setPhotoUri(null);
+
+        // Small delay then open camera
+        setTimeout(() => {
+            capturePhoto();
+        }, 300);
+    };
+
+    const confirmSpotLocation = () => {
         if (!reportingLocation) return;
 
         Alert.alert(
@@ -116,47 +210,34 @@ export default function PulserScreen() {
                 { text: 'Cancel', style: 'cancel' },
                 {
                     text: 'Confirm',
-                    onPress: () => handlePhotoAndSubmit(reportingLocation, reportingAddress)
+                    onPress: handleSubmitSpot
                 }
             ]
         );
     };
 
-    const handlePhotoAndSubmit = async (location: Location, address: string) => {
-        setIsReporting(false); // Exit map mode
+    const handleSubmitSpot = async () => {
+        if (!reportingLocation) return;
 
-        Alert.alert(
-            'Add Photo?',
-            'Would you like to add a photo of the parking spot?',
-            [
-                {
-                    text: 'Skip',
-                    onPress: async () => {
-                        await submitSpot(location.latitude, location.longitude, address);
-                    },
-                },
-                {
-                    text: 'Take Photo',
-                    onPress: async () => {
-                        const result = await ImagePicker.launchCameraAsync({
-                            allowsEditing: true,
-                            quality: 0.7,
-                        });
-
-                        if (!result.canceled) {
-                            await submitSpot(
-                                location.latitude,
-                                location.longitude,
-                                address,
-                                result.assets[0].uri
-                            );
-                        } else {
-                            await submitSpot(location.latitude, location.longitude, address);
-                        }
-                    },
-                },
-            ]
+        setIsReporting(false);
+        await submitSpot(
+            reportingLocation.latitude,
+            reportingLocation.longitude,
+            reportingAddress,
+            photoUri || undefined
         );
+
+        // Reset photo after submit
+        setPhotoUri(null);
+    };
+
+    const cancelReporting = () => {
+        // Clean up photo if didn't submit
+        if (photoUri) {
+            FileSystem.deleteAsync(photoUri, { idempotent: true }).catch(() => { });
+        }
+        setPhotoUri(null);
+        setIsReporting(false);
     };
 
     const submitSpot = async (
@@ -212,16 +293,24 @@ export default function PulserScreen() {
         return (
             <View style={[styles.spotCard, !isActive && styles.spotCardInactive]}>
                 <View style={styles.spotHeader}>
-                    <Text style={styles.spotAddress}>{item.address || 'Unknown location'}</Text>
-                    <View
-                        style={[
-                            styles.statusBadge,
-                            item.status === 'verified' && styles.statusSuccess,
-                            item.status === 'failed' && styles.statusFailed,
-                        ]}
-                    >
-                        <Text style={styles.statusText}>{item.status.toUpperCase()}</Text>
+                    <View style={styles.spotInfo}>
+                        <Text style={styles.spotAddress}>{item.address || 'Unknown location'}</Text>
+                        <View
+                            style={[
+                                styles.statusBadge,
+                                item.status === 'verified' && styles.statusSuccess,
+                                item.status === 'failed' && styles.statusFailed,
+                            ]}
+                        >
+                            <Text style={styles.statusText}>{item.status.toUpperCase()}</Text>
+                        </View>
                     </View>
+                    {item.photo_url && (
+                        <Image
+                            source={{ uri: item.photo_url }}
+                            style={styles.spotThumbnail}
+                        />
+                    )}
                 </View>
                 {isActive && (
                     <Text style={styles.spotTime}>
@@ -235,11 +324,50 @@ export default function PulserScreen() {
         );
     };
 
+    // Photo preview modal
+    const renderPhotoPreviewModal = () => (
+        <Modal
+            visible={showPhotoPreview}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setShowPhotoPreview(false)}
+        >
+            <View style={styles.previewModalOverlay}>
+                <View style={styles.previewModalContent}>
+                    {photoUri && (
+                        <Image
+                            source={{ uri: photoUri }}
+                            style={styles.previewImage}
+                            resizeMode="contain"
+                        />
+                    )}
+
+                    <View style={styles.previewActions}>
+                        <TouchableOpacity
+                            style={styles.previewCloseButton}
+                            onPress={() => setShowPhotoPreview(false)}
+                        >
+                            <Text style={styles.previewCloseText}>✕ Close</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.previewRetakeButton}
+                            onPress={retakePhoto}
+                        >
+                            <Text style={styles.previewRetakeText}>📷 Retake</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </View>
+        </Modal>
+    );
+
+    // Reporting mode with photo capture
     if (isReporting) {
         return (
             <View style={styles.container}>
                 <View style={styles.reportingHeader}>
-                    <TouchableOpacity onPress={() => setIsReporting(false)} style={styles.backButton}>
+                    <TouchableOpacity onPress={cancelReporting} style={styles.backButton}>
                         <Text style={styles.backButtonText}>← Cancel</Text>
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>Set Spot Location</Text>
@@ -254,13 +382,78 @@ export default function PulserScreen() {
                     />
 
                     <View style={styles.locationCard}>
-                        <Text style={styles.locationTitle}>Spot Location</Text>
-                        <Text style={styles.locationAddress}>{reportingAddress}</Text>
-                        <TouchableOpacity style={styles.confirmButton} onPress={confirmSpotLocation}>
-                            <Text style={styles.confirmButtonText}>Confirm & Report</Text>
+                        <View style={styles.locationCardHeader}>
+                            <View style={styles.locationInfo}>
+                                <Text style={styles.locationTitle}>Spot Location</Text>
+                                <Text style={styles.locationAddress}>{reportingAddress}</Text>
+                            </View>
+
+                            {/* Photo Section */}
+                            <View style={styles.photoSection}>
+                                {photoUri ? (
+                                    // Show thumbnail if photo exists
+                                    <TouchableOpacity
+                                        onPress={() => setShowPhotoPreview(true)}
+                                        style={styles.photoThumbnailContainer}
+                                    >
+                                        <Image
+                                            source={{ uri: photoUri }}
+                                            style={styles.photoThumbnail}
+                                        />
+                                        <View style={styles.photoCheckmark}>
+                                            <Text style={styles.photoCheckmarkText}>✓</Text>
+                                        </View>
+                                    </TouchableOpacity>
+                                ) : (
+                                    // Show camera button if no photo
+                                    <TouchableOpacity
+                                        onPress={capturePhoto}
+                                        style={styles.cameraButton}
+                                    >
+                                        <Text style={styles.cameraButtonIcon}>📷</Text>
+                                        <Text style={styles.cameraButtonText}>Photo</Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        </View>
+
+                        {/* Permission denied message */}
+                        {permissionDenied && (
+                            <View style={styles.permissionWarning}>
+                                <Text style={styles.permissionWarningText}>
+                                    ⚠️ Camera permission required for photos
+                                </Text>
+                                <TouchableOpacity onPress={requestPermissions}>
+                                    <Text style={styles.permissionGrantText}>Grant Access</Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
+
+                        {/* Photo status text */}
+                        {photoUri && (
+                            <Text style={styles.photoStatusText}>
+                                📷 Photo attached • Tap to preview
+                            </Text>
+                        )}
+
+                        <TouchableOpacity
+                            style={styles.confirmButton}
+                            onPress={confirmSpotLocation}
+                            disabled={loading}
+                        >
+                            {loading ? (
+                                <ActivityIndicator color="#fff" />
+                            ) : (
+                                <Text style={styles.confirmButtonText}>
+                                    {photoUri ? '✓ Confirm & Report' : 'Confirm & Report'}
+                                </Text>
+                            )}
                         </TouchableOpacity>
                     </View>
                 </View>
+
+                {/* Photo Preview Modal */}
+                {renderPhotoPreviewModal()}
             </View>
         );
     }
@@ -368,22 +561,155 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.25,
         shadowRadius: 3.84,
     },
+    locationCardHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+    },
+    locationInfo: {
+        flex: 1,
+        marginRight: 12,
+    },
     locationTitle: {
         fontSize: 14,
         color: '#666',
         marginBottom: 5,
     },
     locationAddress: {
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: 'bold',
-        marginBottom: 15,
         color: '#333',
     },
+
+    // Photo Section
+    photoSection: {
+        alignItems: 'center',
+    },
+    cameraButton: {
+        backgroundColor: '#f0f0f0',
+        width: 64,
+        height: 64,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: '#ddd',
+        borderStyle: 'dashed',
+    },
+    cameraButtonIcon: {
+        fontSize: 24,
+    },
+    cameraButtonText: {
+        fontSize: 10,
+        color: '#666',
+        marginTop: 2,
+    },
+    photoThumbnailContainer: {
+        position: 'relative',
+    },
+    photoThumbnail: {
+        width: 64,
+        height: 64,
+        borderRadius: 12,
+        backgroundColor: '#e0e0e0',
+    },
+    photoCheckmark: {
+        position: 'absolute',
+        bottom: -4,
+        right: -4,
+        backgroundColor: '#34C759',
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: '#fff',
+    },
+    photoCheckmarkText: {
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: 'bold',
+    },
+    photoStatusText: {
+        fontSize: 12,
+        color: '#34C759',
+        marginTop: 12,
+        marginBottom: 4,
+    },
+
+    // Permission warning
+    permissionWarning: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#fff3cd',
+        padding: 10,
+        borderRadius: 8,
+        marginTop: 10,
+    },
+    permissionWarningText: {
+        fontSize: 12,
+        color: '#856404',
+    },
+    permissionGrantText: {
+        fontSize: 12,
+        color: '#007AFF',
+        fontWeight: '600',
+    },
+
+    // Preview Modal
+    previewModalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.9)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    previewModalContent: {
+        flex: 1,
+        width: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    previewImage: {
+        width: '90%',
+        height: '70%',
+        borderRadius: 12,
+    },
+    previewActions: {
+        flexDirection: 'row',
+        marginTop: 30,
+        gap: 20,
+    },
+    previewCloseButton: {
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        paddingHorizontal: 24,
+        paddingVertical: 12,
+        borderRadius: 25,
+    },
+    previewCloseText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '500',
+    },
+    previewRetakeButton: {
+        backgroundColor: '#007AFF',
+        paddingHorizontal: 24,
+        paddingVertical: 12,
+        borderRadius: 25,
+    },
+    previewRetakeText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+
     confirmButton: {
         backgroundColor: '#34C759',
         padding: 15,
         borderRadius: 10,
         alignItems: 'center',
+        marginTop: 15,
     },
     confirmButtonText: {
         color: '#fff',
@@ -439,18 +765,28 @@ const styles = StyleSheet.create({
         alignItems: 'flex-start',
         marginBottom: 8,
     },
+    spotInfo: {
+        flex: 1,
+        marginRight: 10,
+    },
     spotAddress: {
         fontSize: 16,
         fontWeight: '600',
         color: '#333',
-        flex: 1,
+        marginBottom: 6,
+    },
+    spotThumbnail: {
+        width: 56,
+        height: 56,
+        borderRadius: 8,
+        backgroundColor: '#e0e0e0',
     },
     statusBadge: {
         backgroundColor: '#007AFF',
         paddingHorizontal: 8,
         paddingVertical: 4,
         borderRadius: 4,
-        marginLeft: 10,
+        alignSelf: 'flex-start',
     },
     statusSuccess: {
         backgroundColor: '#34C759',
