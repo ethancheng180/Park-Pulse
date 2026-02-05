@@ -1,7 +1,7 @@
 /**
- * Driver Tab - Request parking and verify spots
+ * Premium Driver Screen - Find Parking with Bottom Sheet & Filters
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
     View,
     Text,
@@ -10,36 +10,73 @@ import {
     StyleSheet,
     Alert,
     ActivityIndicator,
-    Platform,
     FlatList,
     Image,
-    ScrollView,
     Modal,
+    Animated,
+    Dimensions,
+    Linking,
+    PanResponder,
 } from 'react-native';
 import { locationService } from '../services/location';
 import { requestAPI, spotAPI } from '../services/api';
 import { Location, Match, Spot } from '../types';
-
 import UnifiedMap from '../components/UnifiedMap';
 
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const BOTTOM_SHEET_MIN = 120;
+const BOTTOM_SHEET_MID = SCREEN_HEIGHT * 0.4;
+const BOTTOM_SHEET_MAX = SCREEN_HEIGHT * 0.75;
+
+// Distance options in meters
+const DISTANCE_OPTIONS = [
+    { label: '0.5 mi', value: 804 },
+    { label: '1 mi', value: 1609 },
+    { label: '2 mi', value: 3218 },
+    { label: '5 mi', value: 8046 },
+];
+
 export default function DriverScreen() {
+    // Core state
     const [destination, setDestination] = useState('');
     const [destinationCoords, setDestinationCoords] = useState<Location | null>(null);
-    const [maxPrice, setMaxPrice] = useState(10); // dollars
-    const [loading, setLoading] = useState(false);
-    const [match, setMatch] = useState<Match | null>(null);
-    const [timeRemaining, setTimeRemaining] = useState(240); // 4 minutes
     const [userLocation, setUserLocation] = useState<Location | null>(null);
-    const [suggestions, setSuggestions] = useState<string[]>([]);
-    const [showSuggestions, setShowSuggestions] = useState(false);
-    const [showPhotoModal, setShowPhotoModal] = useState(false);
+    const [loading, setLoading] = useState(false);
     const [availableSpots, setAvailableSpots] = useState<Spot[]>([]);
 
+    // Match state
+    const [match, setMatch] = useState<Match | null>(null);
+    const [timeRemaining, setTimeRemaining] = useState(240);
+
+    // Filter state
+    const [maxPrice, setMaxPrice] = useState(15);
+    const [maxDistance, setMaxDistance] = useState(3218); // 2 miles default
+    const [showFilterModal, setShowFilterModal] = useState(false);
+
+    // Selection state
+    const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
+
+    // Suggestions
+    const [suggestions, setSuggestions] = useState<string[]>([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+
+    // Photo modal
+    const [showPhotoModal, setShowPhotoModal] = useState(false);
+
+    // Bottom sheet animation
+    const sheetPosition = useRef(new Animated.Value(BOTTOM_SHEET_MIN)).current;
+    const [sheetExpanded, setSheetExpanded] = useState(false);
+
+    // Initialize
     useEffect(() => {
         getCurrentLocation();
         loadAvailableSpots();
+        // Refresh spots every 30 seconds
+        const interval = setInterval(loadAvailableSpots, 30000);
+        return () => clearInterval(interval);
     }, []);
 
+    // Match timer
     useEffect(() => {
         if (match) {
             const timer = setInterval(() => {
@@ -48,6 +85,40 @@ export default function DriverScreen() {
             return () => clearInterval(timer);
         }
     }, [match]);
+
+    // Calculate distance between two coordinates
+    const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+        const R = 6371000; // Earth radius in meters
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+    };
+
+    // Filtered spots based on price and distance
+    const filteredSpots = useMemo(() => {
+        if (!userLocation) return availableSpots;
+
+        return availableSpots.filter(spot => {
+            const distance = calculateDistance(
+                userLocation.latitude, userLocation.longitude,
+                spot.latitude, spot.longitude
+            );
+            // Filter by distance
+            if (distance > maxDistance) return false;
+            // All spots pass (price filter would go here if spots had prices)
+            return true;
+        }).map(spot => ({
+            ...spot,
+            distance: calculateDistance(
+                userLocation.latitude, userLocation.longitude,
+                spot.latitude, spot.longitude
+            )
+        })).sort((a, b) => a.distance - b.distance);
+    }, [availableSpots, userLocation, maxDistance, maxPrice]);
 
     const getCurrentLocation = async () => {
         try {
@@ -94,7 +165,6 @@ export default function DriverScreen() {
 
         setLoading(true);
         try {
-            // Geocode destination
             const coords = await locationService.geocode(destination);
             if (!coords) {
                 Alert.alert('Error', 'Could not find destination');
@@ -104,53 +174,77 @@ export default function DriverScreen() {
 
             setDestinationCoords(coords);
 
-            // Create parking request with fixed 2000m radius
             const result = await requestAPI.createRequest(
                 coords.latitude,
                 coords.longitude,
-                2000, // Fixed radius
+                maxDistance,
                 maxPrice,
                 destination
             );
 
             if (result.match) {
                 setMatch(result.match);
-                setTimeRemaining(240); // Reset timer
-                Alert.alert(
-                    'Match Found!',
-                    `Found a spot ${Math.round(result.match.distance_meters)}m away for $${result.match.amount}`
-                );
+                setTimeRemaining(240);
+                expandSheet();
             } else {
-                Alert.alert('No Match', 'No parking spots available nearby');
+                Alert.alert('No Spots Found', 'No parking spots available near your destination.');
             }
         } catch (error: any) {
-            Alert.alert(
-                'Error',
-                error.response?.data?.detail || 'Failed to find parking'
-            );
+            console.error('Error finding parking:', error);
+            Alert.alert('Error', error.response?.data?.detail || 'Failed to find parking');
         } finally {
             setLoading(false);
         }
     };
 
+    const handleSpotSelect = (spot: Spot & { distance?: number }) => {
+        setSelectedSpot(spot);
+        expandSheet();
+    };
+
+    const handleNavigate = (spot: Spot) => {
+        const url = `maps://app?daddr=${spot.latitude},${spot.longitude}`;
+        Linking.openURL(url).catch(() => {
+            // Fallback to Google Maps
+            Linking.openURL(`https://maps.google.com/maps?daddr=${spot.latitude},${spot.longitude}`);
+        });
+    };
+
     const handleVerify = async (found: boolean) => {
         if (!match) return;
 
+        setLoading(true);
         try {
-            await requestAPI.verifySpot(match.id, found);
-            Alert.alert(
-                'Success',
-                found ? 'Enjoy your parking!' : 'Refund initiated'
-            );
+            await requestAPI.verifyMatch(match.id, found);
+            if (found) {
+                Alert.alert('🎉 Success!', 'Enjoy your parking spot!');
+            } else {
+                Alert.alert('Spot Not Found', 'We\'ll find you another spot.');
+            }
             setMatch(null);
-            setDestination('');
-            setDestinationCoords(null);
+            setSelectedSpot(null);
+            loadAvailableSpots();
         } catch (error: any) {
-            Alert.alert(
-                'Error',
-                error.response?.data?.detail || 'Failed to verify'
-            );
+            Alert.alert('Error', 'Failed to verify spot');
+        } finally {
+            setLoading(false);
         }
+    };
+
+    const expandSheet = () => {
+        Animated.spring(sheetPosition, {
+            toValue: BOTTOM_SHEET_MID,
+            useNativeDriver: false,
+        }).start();
+        setSheetExpanded(true);
+    };
+
+    const collapseSheet = () => {
+        Animated.spring(sheetPosition, {
+            toValue: BOTTOM_SHEET_MIN,
+            useNativeDriver: false,
+        }).start();
+        setSheetExpanded(false);
     };
 
     const formatTime = (seconds: number) => {
@@ -159,105 +253,144 @@ export default function DriverScreen() {
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
-    return (
-        <View style={styles.container}>
-            {!match ? (
-                <View style={styles.searchContainer}>
-                    <Text style={styles.title}>Find Parking</Text>
+    const formatDistance = (meters: number) => {
+        if (meters < 1000) return `${Math.round(meters)}m`;
+        return `${(meters / 1609).toFixed(1)} mi`;
+    };
 
-                    <View style={styles.inputContainer}>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Destination address"
-                            value={destination}
-                            onChangeText={handleTextChange}
-                            onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
-                        />
-                        {showSuggestions && suggestions.length > 0 && (
-                            <View style={styles.suggestionsContainer}>
-                                <FlatList
-                                    data={suggestions}
-                                    keyExtractor={(item, index) => index.toString()}
-                                    renderItem={({ item }) => (
-                                        <TouchableOpacity
-                                            style={styles.suggestionItem}
-                                            onPress={() => handleSelectSuggestion(item)}
-                                        >
-                                            <Text numberOfLines={1} style={styles.suggestionText}>📍 {item}</Text>
-                                        </TouchableOpacity>
-                                    )}
-                                    style={styles.suggestionsList}
-                                    scrollEnabled={true}
-                                />
-                            </View>
-                        )}
+    const getTimeAgo = (dateString: string) => {
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffMs = now.getTime() - date.getTime();
+        const diffMins = Math.floor(diffMs / 60000);
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        return `${Math.floor(diffMins / 60)}h ago`;
+    };
+
+    // Render spot card in bottom sheet
+    const renderSpotCard = ({ item }: { item: Spot & { distance?: number } }) => {
+        const isSelected = selectedSpot?.id === item.id;
+        return (
+            <TouchableOpacity
+                style={[styles.spotCard, isSelected && styles.spotCardSelected]}
+                onPress={() => handleSpotSelect(item)}
+            >
+                <View style={styles.spotCardHeader}>
+                    <View style={styles.pricePill}>
+                        <Text style={styles.priceText}>$3</Text>
+                    </View>
+                    <View style={styles.spotMeta}>
+                        <Text style={styles.spotType}>🅿️ Street</Text>
+                        <Text style={styles.spotTime}>{getTimeAgo(item.reported_at)}</Text>
+                    </View>
+                </View>
+
+                <Text style={styles.spotAddress} numberOfLines={2}>
+                    {item.address || 'Parking spot available'}
+                </Text>
+
+                <View style={styles.spotCardFooter}>
+                    <Text style={styles.spotDistance}>
+                        📍 {item.distance ? formatDistance(item.distance) : '—'}
+                    </Text>
+                    {isSelected && (
+                        <TouchableOpacity
+                            style={styles.navigateButton}
+                            onPress={() => handleNavigate(item)}
+                        >
+                            <Text style={styles.navigateButtonText}>Navigate →</Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
+
+                {item.photo_url && (
+                    <View style={styles.photoIndicator}>
+                        <Text style={styles.photoIndicatorText}>📷</Text>
+                    </View>
+                )}
+            </TouchableOpacity>
+        );
+    };
+
+    // Filter Modal
+    const renderFilterModal = () => (
+        <Modal
+            visible={showFilterModal}
+            transparent
+            animationType="slide"
+        >
+            <View style={styles.modalOverlay}>
+                <View style={styles.filterModalContent}>
+                    <Text style={styles.filterModalTitle}>Filters</Text>
+
+                    <View style={styles.filterSection}>
+                        <Text style={styles.filterLabel}>Max Price: ${maxPrice}</Text>
+                        <View style={styles.sliderTrack}>
+                            {[5, 10, 15, 20, 25, 30].map((price) => (
+                                <TouchableOpacity
+                                    key={price}
+                                    style={[
+                                        styles.priceChip,
+                                        maxPrice === price && styles.priceChipSelected
+                                    ]}
+                                    onPress={() => setMaxPrice(price)}
+                                >
+                                    <Text style={[
+                                        styles.priceChipText,
+                                        maxPrice === price && styles.priceChipTextSelected
+                                    ]}>${price}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
                     </View>
 
-                    <View style={styles.sliderRow}>
-                        <Text style={styles.label}>Max Price: ${maxPrice}</Text>
-                        <View style={styles.radiusButtons}>
-                            <TouchableOpacity
-                                style={styles.radiusButton}
-                                onPress={() => setMaxPrice(Math.max(1, maxPrice - 1))}
-                            >
-                                <Text>-</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.radiusButton}
-                                onPress={() => setMaxPrice(Math.min(50, maxPrice + 1))}
-                            >
-                                <Text>+</Text>
-                            </TouchableOpacity>
+                    <View style={styles.filterSection}>
+                        <Text style={styles.filterLabel}>Max Distance</Text>
+                        <View style={styles.sliderTrack}>
+                            {DISTANCE_OPTIONS.map((option) => (
+                                <TouchableOpacity
+                                    key={option.value}
+                                    style={[
+                                        styles.priceChip,
+                                        maxDistance === option.value && styles.priceChipSelected
+                                    ]}
+                                    onPress={() => setMaxDistance(option.value)}
+                                >
+                                    <Text style={[
+                                        styles.priceChipText,
+                                        maxDistance === option.value && styles.priceChipTextSelected
+                                    ]}>{option.label}</Text>
+                                </TouchableOpacity>
+                            ))}
                         </View>
                     </View>
 
                     <TouchableOpacity
-                        style={[styles.button, loading && styles.buttonDisabled]}
-                        onPress={handleFindParking}
-                        disabled={loading}
+                        style={styles.filterDoneButton}
+                        onPress={() => setShowFilterModal(false)}
                     >
-                        {loading ? (
-                            <ActivityIndicator color="#fff" />
-                        ) : (
-                            <Text style={styles.buttonText}>🔍 Find Parking</Text>
-                        )}
+                        <Text style={styles.filterDoneButtonText}>Done</Text>
                     </TouchableOpacity>
-
-                    {/* Available spots count */}
-                    {availableSpots.length > 0 && (
-                        <Text style={styles.spotsAvailable}>
-                            📍 {availableSpots.length} parking spot{availableSpots.length !== 1 ? 's' : ''} available nearby
-                        </Text>
-                    )}
-
-                    {userLocation ? (
-                        <UnifiedMap
-                            style={styles.map}
-                            initialRegion={{
-                                latitude: userLocation.latitude,
-                                longitude: userLocation.longitude,
-                                latitudeDelta: 0.02,
-                                longitudeDelta: 0.02,
-                            }}
-                            userLocation={userLocation}
-                            destinationCoords={destinationCoords}
-                            availableSpots={availableSpots}
-                        />
-                    ) : (
-                        <View style={styles.mapPlaceholder}>
-                            <Text>Loading Map...</Text>
-                        </View>
-                    )}
                 </View>
-            ) : (
+            </View>
+        </Modal>
+    );
+
+    // If we have an active match, show verification UI
+    if (match) {
+        return (
+            <View style={styles.container}>
                 <View style={styles.matchContainer}>
-                    <View style={styles.timerContainer}>
-                        <Text style={styles.timerText}>{formatTime(timeRemaining)}</Text>
-                        <Text style={styles.timerLabel}>Time to confirm</Text>
+                    <View style={styles.matchHeader}>
+                        <Text style={styles.matchTitle}>🎯 Spot Found!</Text>
+                        <View style={styles.timerBadge}>
+                            <Text style={styles.timerText}>{formatTime(timeRemaining)}</Text>
+                        </View>
                     </View>
 
                     <UnifiedMap
-                        style={styles.map}
+                        style={styles.matchMap}
                         initialRegion={{
                             latitude: match.spot.latitude,
                             longitude: match.spot.longitude,
@@ -269,326 +402,638 @@ export default function DriverScreen() {
                         userLocation={userLocation}
                     />
 
-                    <View style={styles.matchInfo}>
-                        <Text style={styles.matchAddress}>
-                            {match.spot.address || 'Parking spot'}
-                        </Text>
-                        <Text style={styles.matchDetails}>
-                            Distance: {Math.round(match.distance_meters)}m • Price: ${match.amount}
-                        </Text>
-
-                        {/* Photo Proof Section */}
-                        {match.spot.photo_url ? (
-                            <View style={styles.photoProofSection}>
-                                <Text style={styles.photoProofLabel}>📸 Photo Proof from Pulser</Text>
-                                <TouchableOpacity onPress={() => setShowPhotoModal(true)}>
-                                    <Image
-                                        source={{ uri: match.spot.photo_url }}
-                                        style={styles.photoProofThumbnail}
-                                        resizeMode="cover"
-                                    />
-                                    <Text style={styles.tapToEnlarge}>Tap to enlarge</Text>
-                                </TouchableOpacity>
-                            </View>
-                        ) : (
-                            <View style={styles.noPhotoSection}>
-                                <Text style={styles.noPhotoText}>📷 No photo provided</Text>
-                            </View>
-                        )}
-
-                        <Text style={styles.confirmLabel}>Did you find the spot?</Text>
-
-                        <View style={styles.confirmButtons}>
-                            <TouchableOpacity
-                                style={[styles.confirmButton, styles.confirmYes]}
-                                onPress={() => handleVerify(true)}
-                            >
-                                <Text style={styles.confirmButtonText}>✅ Found It</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[styles.confirmButton, styles.confirmNo]}
-                                onPress={() => handleVerify(false)}
-                            >
-                                <Text style={styles.confirmButtonText}>❌ Not There</Text>
-                            </TouchableOpacity>
+                    <View style={styles.matchDetails}>
+                        <View style={styles.matchPricePill}>
+                            <Text style={styles.matchPriceText}>${match.amount.toFixed(2)}</Text>
                         </View>
+                        <Text style={styles.matchAddress}>{match.spot.address || 'Parking spot'}</Text>
+                        <Text style={styles.matchDistance}>
+                            📍 {formatDistance(match.distance_meters)} away
+                        </Text>
+
+                        {match.spot.photo_url && (
+                            <TouchableOpacity
+                                style={styles.photoPreview}
+                                onPress={() => setShowPhotoModal(true)}
+                            >
+                                <Image
+                                    source={{ uri: match.spot.photo_url }}
+                                    style={styles.photoThumbnail}
+                                    resizeMode="cover"
+                                />
+                                <Text style={styles.viewPhotoText}>Tap to view photo</Text>
+                            </TouchableOpacity>
+                        )}
                     </View>
 
-                    {/* Full Screen Photo Modal */}
-                    <Modal
-                        visible={showPhotoModal}
-                        transparent={true}
-                        animationType="fade"
-                        onRequestClose={() => setShowPhotoModal(false)}
-                    >
+                    <View style={styles.matchActions}>
                         <TouchableOpacity
-                            style={styles.photoModalOverlay}
-                            activeOpacity={1}
+                            style={styles.navigateFullButton}
+                            onPress={() => handleNavigate(match.spot)}
+                        >
+                            <Text style={styles.navigateFullButtonText}>🧭 Navigate</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.verifyActions}>
+                        <TouchableOpacity
+                            style={[styles.verifyButton, styles.verifyFoundButton]}
+                            onPress={() => handleVerify(true)}
+                            disabled={loading}
+                        >
+                            <Text style={styles.verifyButtonText}>✅ Found It</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.verifyButton, styles.verifyNotFoundButton]}
+                            onPress={() => handleVerify(false)}
+                            disabled={loading}
+                        >
+                            <Text style={styles.verifyNotFoundText}>❌ Not There</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                {/* Photo Modal */}
+                <Modal visible={showPhotoModal} transparent animationType="fade">
+                    <View style={styles.photoModalOverlay}>
+                        <TouchableOpacity
+                            style={styles.photoModalClose}
                             onPress={() => setShowPhotoModal(false)}
                         >
-                            <View style={styles.photoModalContent}>
-                                <Image
-                                    source={{ uri: match.spot.photo_url || '' }}
-                                    style={styles.photoModalImage}
-                                    resizeMode="contain"
-                                />
-                                <Text style={styles.photoModalClose}>Tap anywhere to close</Text>
-                            </View>
+                            <Text style={styles.photoModalCloseText}>✕ Close</Text>
                         </TouchableOpacity>
-                    </Modal>
+                        {match.spot.photo_url && (
+                            <Image
+                                source={{ uri: match.spot.photo_url }}
+                                style={styles.photoModalImage}
+                                resizeMode="contain"
+                            />
+                        )}
+                    </View>
+                </Modal>
+            </View>
+        );
+    }
+
+    // Main search UI
+    return (
+        <View style={styles.container}>
+            {/* Map takes full screen */}
+            {userLocation ? (
+                <UnifiedMap
+                    style={styles.fullMap}
+                    initialRegion={{
+                        latitude: userLocation.latitude,
+                        longitude: userLocation.longitude,
+                        latitudeDelta: 0.02,
+                        longitudeDelta: 0.02,
+                    }}
+                    userLocation={userLocation}
+                    destinationCoords={destinationCoords}
+                    availableSpots={filteredSpots}
+                />
+            ) : (
+                <View style={styles.mapLoading}>
+                    <ActivityIndicator size="large" color="#007AFF" />
+                    <Text style={styles.mapLoadingText}>Loading map...</Text>
                 </View>
-            )
-            }
-        </View >
+            )}
+
+            {/* Search Bar Overlay */}
+            <View style={styles.searchOverlay}>
+                <View style={styles.searchBar}>
+                    <TextInput
+                        style={styles.searchInput}
+                        placeholder="Where are you heading?"
+                        placeholderTextColor="#999"
+                        value={destination}
+                        onChangeText={handleTextChange}
+                        onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+                    />
+                    {showSuggestions && suggestions.length > 0 && (
+                        <View style={styles.suggestionsDropdown}>
+                            <FlatList
+                                data={suggestions}
+                                keyExtractor={(item, index) => index.toString()}
+                                renderItem={({ item }) => (
+                                    <TouchableOpacity
+                                        style={styles.suggestionItem}
+                                        onPress={() => handleSelectSuggestion(item)}
+                                    >
+                                        <Text numberOfLines={1} style={styles.suggestionText}>📍 {item}</Text>
+                                    </TouchableOpacity>
+                                )}
+                            />
+                        </View>
+                    )}
+                </View>
+
+                {/* Filter Chips */}
+                <View style={styles.filterChips}>
+                    <TouchableOpacity
+                        style={styles.filterChip}
+                        onPress={() => setShowFilterModal(true)}
+                    >
+                        <Text style={styles.filterChipText}>💰 Max ${maxPrice}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={styles.filterChip}
+                        onPress={() => setShowFilterModal(true)}
+                    >
+                        <Text style={styles.filterChipText}>
+                            📍 {DISTANCE_OPTIONS.find(d => d.value === maxDistance)?.label}
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={styles.filterChipRefresh}
+                        onPress={loadAvailableSpots}
+                    >
+                        <Text style={styles.filterChipText}>🔄</Text>
+                    </TouchableOpacity>
+                </View>
+
+                {/* Find Button */}
+                <TouchableOpacity
+                    style={[styles.findButton, loading && styles.findButtonDisabled]}
+                    onPress={handleFindParking}
+                    disabled={loading}
+                >
+                    {loading ? (
+                        <ActivityIndicator color="#fff" />
+                    ) : (
+                        <Text style={styles.findButtonText}>🔍 Find Parking</Text>
+                    )}
+                </TouchableOpacity>
+            </View>
+
+            {/* Bottom Sheet */}
+            <Animated.View style={[styles.bottomSheet, { height: sheetPosition }]}>
+                <TouchableOpacity
+                    style={styles.sheetHandle}
+                    onPress={sheetExpanded ? collapseSheet : expandSheet}
+                >
+                    <View style={styles.handleBar} />
+                </TouchableOpacity>
+
+                <View style={styles.sheetHeader}>
+                    <Text style={styles.sheetTitle}>
+                        {filteredSpots.length} Spots Nearby
+                    </Text>
+                    <TouchableOpacity onPress={() => setShowFilterModal(true)}>
+                        <Text style={styles.sheetFilterLink}>Filters</Text>
+                    </TouchableOpacity>
+                </View>
+
+                <FlatList
+                    data={filteredSpots}
+                    keyExtractor={(item) => item.id.toString()}
+                    renderItem={renderSpotCard}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.spotList}
+                />
+            </Animated.View>
+
+            {/* Filter Modal */}
+            {renderFilterModal()}
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f5f5f5',
+        backgroundColor: '#f8f9fa',
     },
-    searchContainer: {
+    fullMap: {
         flex: 1,
-        padding: 20,
     },
-    title: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        marginBottom: 20,
-        color: '#333',
-    },
-    input: {
-        backgroundColor: '#fff',
-        padding: 15,
-        borderRadius: 10,
-        marginBottom: 15,
-        fontSize: 16,
-        borderWidth: 1,
-        borderColor: '#ddd',
-    },
-    sliderRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 15,
-    },
-    label: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#333',
-    },
-    radiusButtons: {
-        flexDirection: 'row',
-        gap: 10,
-    },
-    radiusButton: {
-        backgroundColor: '#fff',
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+    mapLoading: {
+        flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#ddd',
+        backgroundColor: '#f0f0f0',
     },
-    button: {
-        backgroundColor: '#007AFF',
-        padding: 18,
-        borderRadius: 10,
-        alignItems: 'center',
-        marginBottom: 20,
-    },
-    buttonDisabled: {
-        opacity: 0.5,
-    },
-    buttonText: {
-        color: '#fff',
-        fontSize: 18,
-        fontWeight: 'bold',
-    },
-    map: {
-        flex: 1,
-        borderRadius: 10,
-    },
-    mapPlaceholder: {
-        flex: 1,
-        backgroundColor: '#e0e0e0',
-        borderRadius: 10,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 20,
-    },
-    mapPlaceholderText: {
-        fontSize: 40,
-        marginBottom: 10,
-    },
-    mapPlaceholderSubtext: {
-        fontSize: 14,
+    mapLoadingText: {
+        marginTop: 10,
         color: '#666',
-        marginTop: 5,
     },
-    matchContainer: {
-        flex: 1,
-    },
-    timerContainer: {
-        backgroundColor: '#FF9500',
-        padding: 20,
-        alignItems: 'center',
-    },
-    timerText: {
-        fontSize: 48,
-        fontWeight: 'bold',
-        color: '#fff',
-    },
-    timerLabel: {
-        fontSize: 14,
-        color: '#fff',
-        marginTop: 5,
-    },
-    matchInfo: {
-        padding: 20,
-        backgroundColor: '#fff',
-    },
-    matchAddress: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 5,
-    },
-    matchDetails: {
-        fontSize: 14,
-        color: '#666',
-        marginBottom: 20,
-    },
-    confirmLabel: {
-        fontSize: 16,
-        fontWeight: '600',
-        marginBottom: 15,
-        color: '#333',
-    },
-    confirmButtons: {
-        flexDirection: 'row',
-        gap: 10,
-    },
-    confirmButton: {
-        flex: 1,
-        padding: 18,
-        borderRadius: 10,
-        alignItems: 'center',
-    },
-    confirmYes: {
-        backgroundColor: '#34C759',
-    },
-    confirmNo: {
-        backgroundColor: '#FF3B30',
-    },
-    confirmButtonText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    inputContainer: {
-        width: '100%',
-        position: 'relative',
-        zIndex: 10,
-    },
-    suggestionsContainer: {
+
+    // Search Overlay
+    searchOverlay: {
         position: 'absolute',
-        top: 50,
+        top: 60,
         left: 0,
         right: 0,
+        paddingHorizontal: 16,
+    },
+    searchBar: {
         backgroundColor: '#fff',
-        borderRadius: 10,
-        elevation: 5,
+        borderRadius: 12,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 3.84,
-        zIndex: 1000,
-        maxHeight: 200,
-        borderColor: '#ddd',
-        borderWidth: 1,
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        elevation: 5,
     },
-    suggestionsList: {
-        width: '100%',
+    searchInput: {
+        padding: 16,
+        fontSize: 16,
+        color: '#333',
+    },
+    suggestionsDropdown: {
+        borderTopWidth: 1,
+        borderTopColor: '#eee',
+        maxHeight: 200,
     },
     suggestionItem: {
-        padding: 15,
+        padding: 12,
         borderBottomWidth: 1,
-        borderBottomColor: '#eee',
+        borderBottomColor: '#f0f0f0',
     },
     suggestionText: {
         fontSize: 14,
         color: '#333',
     },
-    // Photo Proof Styles
-    photoProofSection: {
-        marginVertical: 15,
-        padding: 10,
-        backgroundColor: '#f8f9fa',
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: '#e9ecef',
+
+    // Filter Chips
+    filterChips: {
+        flexDirection: 'row',
+        marginTop: 10,
+        gap: 8,
     },
-    photoProofLabel: {
-        fontSize: 14,
+    filterChip: {
+        backgroundColor: '#fff',
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
+        elevation: 2,
+    },
+    filterChipRefresh: {
+        backgroundColor: '#fff',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
+        elevation: 2,
+    },
+    filterChipText: {
+        fontSize: 13,
+        color: '#333',
+        fontWeight: '500',
+    },
+
+    // Find Button
+    findButton: {
+        backgroundColor: '#007AFF',
+        padding: 16,
+        borderRadius: 12,
+        marginTop: 12,
+        alignItems: 'center',
+        shadowColor: '#007AFF',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 5,
+    },
+    findButtonDisabled: {
+        opacity: 0.7,
+    },
+    findButtonText: {
+        color: '#fff',
+        fontSize: 16,
         fontWeight: '600',
-        color: '#495057',
+    },
+
+    // Bottom Sheet
+    bottomSheet: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: '#fff',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -3 },
+        shadowOpacity: 0.15,
+        shadowRadius: 10,
+        elevation: 10,
+    },
+    sheetHandle: {
+        alignItems: 'center',
+        paddingVertical: 12,
+    },
+    handleBar: {
+        width: 40,
+        height: 4,
+        backgroundColor: '#ddd',
+        borderRadius: 2,
+    },
+    sheetHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 16,
         marginBottom: 10,
     },
-    photoProofThumbnail: {
-        width: '100%',
-        height: 180,
-        borderRadius: 8,
-        backgroundColor: '#dee2e6',
+    sheetTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#333',
     },
-    tapToEnlarge: {
-        fontSize: 12,
-        color: '#6c757d',
-        textAlign: 'center',
-        marginTop: 5,
+    sheetFilterLink: {
+        fontSize: 14,
+        color: '#007AFF',
+        fontWeight: '500',
     },
-    noPhotoSection: {
-        marginVertical: 15,
-        padding: 15,
-        backgroundColor: '#f8f9fa',
-        borderRadius: 10,
+
+    // Spot Cards
+    spotList: {
+        paddingHorizontal: 16,
+        paddingBottom: 20,
+    },
+    spotCard: {
+        width: 200,
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 14,
+        marginRight: 12,
+        borderWidth: 2,
+        borderColor: '#f0f0f0',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    spotCardSelected: {
+        borderColor: '#007AFF',
+    },
+    spotCardHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    pricePill: {
+        backgroundColor: '#34C759',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    priceText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '700',
+    },
+    spotMeta: {
+        alignItems: 'flex-end',
+    },
+    spotType: {
+        fontSize: 11,
+        color: '#666',
+    },
+    spotTime: {
+        fontSize: 10,
+        color: '#999',
+    },
+    spotAddress: {
+        fontSize: 13,
+        color: '#333',
+        marginBottom: 8,
+    },
+    spotCardFooter: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
         alignItems: 'center',
     },
-    noPhotoText: {
-        fontSize: 14,
-        color: '#6c757d',
+    spotDistance: {
+        fontSize: 12,
+        color: '#666',
     },
+    navigateButton: {
+        backgroundColor: '#007AFF',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 6,
+    },
+    navigateButtonText: {
+        color: '#fff',
+        fontSize: 11,
+        fontWeight: '600',
+    },
+    photoIndicator: {
+        position: 'absolute',
+        top: 8,
+        right: 8,
+    },
+    photoIndicatorText: {
+        fontSize: 14,
+    },
+
+    // Filter Modal
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
+    filterModalContent: {
+        backgroundColor: '#fff',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        padding: 24,
+        paddingBottom: 40,
+    },
+    filterModalTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        textAlign: 'center',
+        marginBottom: 24,
+    },
+    filterSection: {
+        marginBottom: 24,
+    },
+    filterLabel: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#333',
+        marginBottom: 12,
+    },
+    sliderTrack: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    priceChip: {
+        backgroundColor: '#f0f0f0',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 20,
+    },
+    priceChipSelected: {
+        backgroundColor: '#007AFF',
+    },
+    priceChipText: {
+        fontSize: 14,
+        color: '#333',
+        fontWeight: '500',
+    },
+    priceChipTextSelected: {
+        color: '#fff',
+    },
+    filterDoneButton: {
+        backgroundColor: '#007AFF',
+        padding: 16,
+        borderRadius: 12,
+        alignItems: 'center',
+    },
+    filterDoneButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+
+    // Match View
+    matchContainer: {
+        flex: 1,
+        padding: 16,
+    },
+    matchHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    matchTitle: {
+        fontSize: 24,
+        fontWeight: '700',
+    },
+    timerBadge: {
+        backgroundColor: '#FF9500',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 16,
+    },
+    timerText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    matchMap: {
+        height: 200,
+        borderRadius: 12,
+        marginBottom: 16,
+    },
+    matchDetails: {
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 16,
+    },
+    matchPricePill: {
+        backgroundColor: '#34C759',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 16,
+        alignSelf: 'flex-start',
+        marginBottom: 12,
+    },
+    matchPriceText: {
+        color: '#fff',
+        fontSize: 20,
+        fontWeight: '700',
+    },
+    matchAddress: {
+        fontSize: 16,
+        color: '#333',
+        marginBottom: 4,
+    },
+    matchDistance: {
+        fontSize: 14,
+        color: '#666',
+    },
+    photoPreview: {
+        marginTop: 12,
+    },
+    photoThumbnail: {
+        width: '100%',
+        height: 120,
+        borderRadius: 8,
+    },
+    viewPhotoText: {
+        fontSize: 12,
+        color: '#007AFF',
+        textAlign: 'center',
+        marginTop: 4,
+    },
+    matchActions: {
+        marginBottom: 16,
+    },
+    navigateFullButton: {
+        backgroundColor: '#007AFF',
+        padding: 16,
+        borderRadius: 12,
+        alignItems: 'center',
+    },
+    navigateFullButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    verifyActions: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    verifyButton: {
+        flex: 1,
+        padding: 16,
+        borderRadius: 12,
+        alignItems: 'center',
+    },
+    verifyFoundButton: {
+        backgroundColor: '#34C759',
+    },
+    verifyNotFoundButton: {
+        backgroundColor: '#f0f0f0',
+    },
+    verifyButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    verifyNotFoundText: {
+        color: '#333',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+
+    // Photo Modal
     photoModalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.9)',
         justifyContent: 'center',
         alignItems: 'center',
     },
-    photoModalContent: {
-        width: '100%',
-        height: '100%',
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 20,
+    photoModalClose: {
+        position: 'absolute',
+        top: 60,
+        right: 20,
+        zIndex: 10,
+    },
+    photoModalCloseText: {
+        color: '#fff',
+        fontSize: 16,
     },
     photoModalImage: {
         width: '100%',
-        height: '80%',
-    },
-    photoModalClose: {
-        color: '#fff',
-        fontSize: 14,
-        marginTop: 20,
-        opacity: 0.7,
-    },
-    spotsAvailable: {
-        fontSize: 14,
-        color: '#34C759',
-        fontWeight: '600',
-        textAlign: 'center',
-        marginTop: 10,
-        marginBottom: 5,
+        height: '70%',
     },
 });
