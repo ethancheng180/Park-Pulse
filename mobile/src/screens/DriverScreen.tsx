@@ -11,28 +11,13 @@ import {
     Alert,
     ActivityIndicator,
     Platform,
+    FlatList,
 } from 'react-native';
 import { locationService } from '../services/location';
 import { requestAPI } from '../services/api';
 import { Location, Match } from '../types';
 
-// Map components - conditional loading based on platform
-// Note: react-native-maps requires a development build (not Expo Go)
-// For Expo Go testing, we use a placeholder on native
-let MapView: any = null;
-let Marker: any = null;
-let Circle: any = null;
-let WebMap: any = null;
-
-if (Platform.OS === 'web') {
-    // Web uses Leaflet (works in browser)
-    try {
-        WebMap = require('../components/WebMap').default;
-    } catch (e) {
-        console.log('WebMap not available');
-    }
-}
-// Note: For native maps, use a development build with react-native-maps
+import UnifiedMap from '../components/UnifiedMap';
 
 export default function DriverScreen() {
     const [destination, setDestination] = useState('');
@@ -43,6 +28,8 @@ export default function DriverScreen() {
     const [match, setMatch] = useState<Match | null>(null);
     const [timeRemaining, setTimeRemaining] = useState(240); // 4 minutes
     const [userLocation, setUserLocation] = useState<Location | null>(null);
+    const [suggestions, setSuggestions] = useState<string[]>([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
 
     useEffect(() => {
         getCurrentLocation();
@@ -64,6 +51,24 @@ export default function DriverScreen() {
         } catch (error) {
             console.error('Error getting location:', error);
         }
+    };
+
+    const handleTextChange = async (text: string) => {
+        setDestination(text);
+        if (text.length > 2) {
+            const results = await locationService.getSuggestions(text);
+            setSuggestions(results);
+            setShowSuggestions(true);
+        } else {
+            setSuggestions([]);
+            setShowSuggestions(false);
+        }
+    };
+
+    const handleSelectSuggestion = (address: string) => {
+        setDestination(address);
+        setSuggestions([]);
+        setShowSuggestions(false);
     };
 
     const handleFindParking = async () => {
@@ -145,12 +150,33 @@ export default function DriverScreen() {
                 <View style={styles.searchContainer}>
                     <Text style={styles.title}>Find Parking</Text>
 
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Destination address"
-                        value={destination}
-                        onChangeText={setDestination}
-                    />
+                    <View style={styles.inputContainer}>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Destination address"
+                            value={destination}
+                            onChangeText={handleTextChange}
+                            onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+                        />
+                        {showSuggestions && suggestions.length > 0 && (
+                            <View style={styles.suggestionsContainer}>
+                                <FlatList
+                                    data={suggestions}
+                                    keyExtractor={(item, index) => index.toString()}
+                                    renderItem={({ item }) => (
+                                        <TouchableOpacity
+                                            style={styles.suggestionItem}
+                                            onPress={() => handleSelectSuggestion(item)}
+                                        >
+                                            <Text numberOfLines={1} style={styles.suggestionText}>📍 {item}</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                    style={styles.suggestionsList}
+                                    scrollEnabled={true}
+                                />
+                            </View>
+                        )}
+                    </View>
 
                     <View style={styles.sliderRow}>
                         <Text style={styles.label}>Radius: {radius}m</Text>
@@ -200,8 +226,8 @@ export default function DriverScreen() {
                         )}
                     </TouchableOpacity>
 
-                    {Platform.OS !== 'web' && userLocation && MapView ? (
-                        <MapView
+                    {userLocation ? (
+                        <UnifiedMap
                             style={styles.map}
                             initialRegion={{
                                 latitude: userLocation.latitude,
@@ -209,41 +235,13 @@ export default function DriverScreen() {
                                 latitudeDelta: 0.02,
                                 longitudeDelta: 0.02,
                             }}
-                        >
-                            <Marker coordinate={userLocation} title="You" />
-                            {destinationCoords && (
-                                <>
-                                    <Marker
-                                        coordinate={destinationCoords}
-                                        title="Destination"
-                                        pinColor="green"
-                                    />
-                                    <Circle
-                                        center={destinationCoords}
-                                        radius={radius}
-                                        strokeColor="rgba(0,122,255,0.5)"
-                                        fillColor="rgba(0,122,255,0.1)"
-                                    />
-                                </>
-                            )}
-                        </MapView>
-                    ) : Platform.OS === 'web' && WebMap && userLocation ? (
-                        <WebMap
-                            center={destinationCoords || userLocation}
-                            zoom={15}
-                            markers={[
-                                { position: userLocation, title: 'You', color: 'blue' },
-                                ...(destinationCoords ? [{ position: destinationCoords, title: 'Destination', color: 'green' as const }] : []),
-                            ]}
-                            circle={destinationCoords ? { center: destinationCoords, radius } : undefined}
-                            style={{ flex: 1, borderRadius: 10 }}
+                            userLocation={userLocation}
+                            destinationCoords={destinationCoords}
+                            radius={radius}
                         />
                     ) : (
                         <View style={styles.mapPlaceholder}>
-                            <Text style={styles.mapPlaceholderText}>📍 Loading Map...</Text>
-                            <Text style={styles.mapPlaceholderSubtext}>
-                                {userLocation ? `Your location: ${userLocation.latitude.toFixed(4)}, ${userLocation.longitude.toFixed(4)}` : 'Getting location...'}
-                            </Text>
+                            <Text>Loading Map...</Text>
                         </View>
                     )}
                 </View>
@@ -254,47 +252,18 @@ export default function DriverScreen() {
                         <Text style={styles.timerLabel}>Time to confirm</Text>
                     </View>
 
-                    {Platform.OS !== 'web' && MapView ? (
-                        <MapView
-                            style={styles.map}
-                            initialRegion={{
-                                latitude: match.spot.latitude,
-                                longitude: match.spot.longitude,
-                                latitudeDelta: 0.01,
-                                longitudeDelta: 0.01,
-                            }}
-                        >
-                            <Marker
-                                coordinate={{
-                                    latitude: match.spot.latitude,
-                                    longitude: match.spot.longitude,
-                                }}
-                                title="Parking Spot"
-                                description={match.spot.address || undefined}
-                                pinColor="blue"
-                            />
-                            {userLocation && (
-                                <Marker coordinate={userLocation} title="You" />
-                            )}
-                        </MapView>
-                    ) : Platform.OS === 'web' && WebMap ? (
-                        <WebMap
-                            center={{ latitude: match.spot.latitude, longitude: match.spot.longitude }}
-                            zoom={16}
-                            markers={[
-                                { position: { latitude: match.spot.latitude, longitude: match.spot.longitude }, title: 'Parking Spot', color: 'orange' },
-                                ...(userLocation ? [{ position: userLocation, title: 'You', color: 'blue' as const }] : []),
-                            ]}
-                            style={{ flex: 1 }}
-                        />
-                    ) : (
-                        <View style={styles.mapPlaceholder}>
-                            <Text style={styles.mapPlaceholderText}>📍 Parking Spot</Text>
-                            <Text style={styles.mapPlaceholderSubtext}>
-                                Location: {match.spot.latitude.toFixed(4)}, {match.spot.longitude.toFixed(4)}
-                            </Text>
-                        </View>
-                    )}
+                    <UnifiedMap
+                        style={styles.map}
+                        initialRegion={{
+                            latitude: match.spot.latitude,
+                            longitude: match.spot.longitude,
+                            latitudeDelta: 0.01,
+                            longitudeDelta: 0.01,
+                        }}
+                        spotLocation={{ latitude: match.spot.latitude, longitude: match.spot.longitude }}
+                        spotAddress={match.spot.address || undefined}
+                        userLocation={userLocation}
+                    />
 
                     <View style={styles.matchInfo}>
                         <Text style={styles.matchAddress}>
@@ -322,8 +291,9 @@ export default function DriverScreen() {
                         </View>
                     </View>
                 </View>
-            )}
-        </View>
+            )
+            }
+        </View >
     );
 }
 
@@ -471,5 +441,39 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 16,
         fontWeight: 'bold',
+    },
+    inputContainer: {
+        width: '100%',
+        position: 'relative',
+        zIndex: 10,
+    },
+    suggestionsContainer: {
+        position: 'absolute',
+        top: 50,
+        left: 0,
+        right: 0,
+        backgroundColor: '#fff',
+        borderRadius: 10,
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+        zIndex: 1000,
+        maxHeight: 200,
+        borderColor: '#ddd',
+        borderWidth: 1,
+    },
+    suggestionsList: {
+        width: '100%',
+    },
+    suggestionItem: {
+        padding: 15,
+        borderBottomWidth: 1,
+        borderBottomColor: '#eee',
+    },
+    suggestionText: {
+        fontSize: 14,
+        color: '#333',
     },
 });

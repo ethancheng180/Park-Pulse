@@ -57,4 +57,31 @@ export const locationService = {
             return null;
         }
     },
+
+    async getSuggestions(query: string): Promise<string[]> {
+        if (!query || query.length < 3) return [];
+
+        try {
+            // Use OpenStreetMap Nominatim API for autocomplete
+            // Limit to 5 results, search globally but could restrict
+            const response = await fetch(
+                `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`,
+                {
+                    headers: {
+                        'User-Agent': 'ParkPulse/1.0' // Nominatim requires a User-Agent
+                    }
+                }
+            );
+
+            const data = await response.json();
+
+            if (Array.isArray(data)) {
+                return data.map((item: any) => item.display_name);
+            }
+            return [];
+        } catch (error) {
+            console.error('Error fetching suggestions:', error);
+            return [];
+        }
+    },
 };

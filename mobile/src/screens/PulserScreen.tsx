@@ -14,12 +14,24 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { locationService } from '../services/location';
 import { spotAPI } from '../services/api';
-import { Spot } from '../types';
+import { Spot, Location } from '../types';
+import UnifiedMap from '../components/UnifiedMap';
 
 export default function PulserScreen() {
     const [spots, setSpots] = useState<Spot[]>([]);
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
+
+    // Map reporting state
+    const [isReporting, setIsReporting] = useState(false);
+    const [reportingLocation, setReportingLocation] = useState<Location | null>(null);
+    const [initialRegion, setInitialRegion] = useState({
+        latitude: 37.78825,
+        longitude: -122.4324,
+        latitudeDelta: 0.005,
+        longitudeDelta: 0.005,
+    });
+    const [reportingAddress, setReportingAddress] = useState('Loading address...');
 
     useEffect(() => {
         loadSpots();
@@ -44,55 +56,105 @@ export default function PulserScreen() {
         }
     };
 
-    const reportSpot = async () => {
+    const startReporting = async () => {
         setLoading(true);
         try {
-            // Get current location
             const location = await locationService.getCurrentLocation();
+            setReportingLocation(location);
+            setInitialRegion({
+                latitude: location.latitude,
+                longitude: location.longitude,
+                latitudeDelta: 0.005,
+                longitudeDelta: 0.005,
+            });
 
-            // Get address
+            // Get initial address
             const address = await locationService.reverseGeocode(
                 location.latitude,
                 location.longitude
             );
+            setReportingAddress(address);
 
-            // Ask if user wants to add a photo (optional)
-            Alert.alert(
-                'Add Photo?',
-                'Would you like to add a photo of the parking spot?',
-                [
-                    {
-                        text: 'Skip',
-                        onPress: async () => {
-                            await submitSpot(location.latitude, location.longitude, address);
-                        },
-                    },
-                    {
-                        text: 'Take Photo',
-                        onPress: async () => {
-                            const result = await ImagePicker.launchCameraAsync({
-                                allowsEditing: true,
-                                quality: 0.7,
-                            });
-
-                            if (!result.canceled) {
-                                await submitSpot(
-                                    location.latitude,
-                                    location.longitude,
-                                    address,
-                                    result.assets[0].uri
-                                );
-                            } else {
-                                await submitSpot(location.latitude, location.longitude, address);
-                            }
-                        },
-                    },
-                ]
-            );
-        } catch (error: any) {
-            Alert.alert('Error', error.message || 'Failed to get location');
+            setIsReporting(true);
+        } catch (error) {
+            Alert.alert('Error', 'Could not get current location');
+        } finally {
             setLoading(false);
         }
+    };
+
+    const handleRegionChange = async (region: any) => {
+        // Update reporting location center
+        // Debounce this in production, but direct set for now
+        // We only update the address on confirming or with a debounce 
+        // effectively handled by the user stopping dragging
+    };
+
+    const handleRegionChangeComplete = async (region: any) => {
+        setReportingLocation({
+            latitude: region.latitude,
+            longitude: region.longitude
+        });
+
+        // Reverse geocode new center
+        const address = await locationService.reverseGeocode(
+            region.latitude,
+            region.longitude
+        );
+        setReportingAddress(address);
+    };
+
+    const confirmSpotLocation = async () => {
+        if (!reportingLocation) return;
+
+        Alert.alert(
+            'Confirm Location',
+            `Report spot at:\n${reportingAddress}?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Confirm',
+                    onPress: () => handlePhotoAndSubmit(reportingLocation, reportingAddress)
+                }
+            ]
+        );
+    };
+
+    const handlePhotoAndSubmit = async (location: Location, address: string) => {
+        setIsReporting(false); // Exit map mode
+
+        Alert.alert(
+            'Add Photo?',
+            'Would you like to add a photo of the parking spot?',
+            [
+                {
+                    text: 'Skip',
+                    onPress: async () => {
+                        await submitSpot(location.latitude, location.longitude, address);
+                    },
+                },
+                {
+                    text: 'Take Photo',
+                    onPress: async () => {
+                        const result = await ImagePicker.launchCameraAsync({
+                            allowsEditing: true,
+                            quality: 0.7,
+                        });
+
+                        if (!result.canceled) {
+                            await submitSpot(
+                                location.latitude,
+                                location.longitude,
+                                address,
+                                result.assets[0].uri
+                            );
+                        } else {
+                            await submitSpot(location.latitude, location.longitude, address);
+                        }
+                    },
+                },
+            ]
+        );
     };
 
     const submitSpot = async (
@@ -146,6 +208,36 @@ export default function PulserScreen() {
         );
     };
 
+    if (isReporting) {
+        return (
+            <View style={styles.container}>
+                <View style={styles.reportingHeader}>
+                    <TouchableOpacity onPress={() => setIsReporting(false)} style={styles.backButton}>
+                        <Text style={styles.backButtonText}>← Cancel</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>Set Spot Location</Text>
+                </View>
+
+                <View style={styles.mapContainer}>
+                    <UnifiedMap
+                        style={styles.map}
+                        initialRegion={initialRegion}
+                        showCenterMarker={true}
+                        onRegionChangeComplete={handleRegionChangeComplete}
+                    />
+
+                    <View style={styles.locationCard}>
+                        <Text style={styles.locationTitle}>Spot Location</Text>
+                        <Text style={styles.locationAddress}>{reportingAddress}</Text>
+                        <TouchableOpacity style={styles.confirmButton} onPress={confirmSpotLocation}>
+                            <Text style={styles.confirmButtonText}>Confirm & Report</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </View>
+        );
+    }
+
     return (
         <View style={styles.container}>
             <View style={styles.header}>
@@ -155,7 +247,7 @@ export default function PulserScreen() {
 
             <TouchableOpacity
                 style={[styles.reportButton, loading && styles.reportButtonDisabled]}
-                onPress={reportSpot}
+                onPress={startReporting}
                 disabled={loading}
             >
                 {loading ? (
@@ -206,6 +298,70 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#666',
         marginTop: 5,
+    },
+    reportingHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingTop: 50,
+        paddingBottom: 20,
+        paddingHorizontal: 20,
+        backgroundColor: '#fff',
+        zIndex: 10,
+    },
+    headerTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginLeft: 20,
+    },
+    backButton: {
+        padding: 5,
+    },
+    backButtonText: {
+        fontSize: 16,
+        color: '#007AFF',
+    },
+    mapContainer: {
+        flex: 1,
+        position: 'relative',
+    },
+    map: {
+        flex: 1,
+    },
+    locationCard: {
+        position: 'absolute',
+        bottom: 30,
+        left: 20,
+        right: 20,
+        backgroundColor: '#fff',
+        padding: 20,
+        borderRadius: 15,
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+    },
+    locationTitle: {
+        fontSize: 14,
+        color: '#666',
+        marginBottom: 5,
+    },
+    locationAddress: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginBottom: 15,
+        color: '#333',
+    },
+    confirmButton: {
+        backgroundColor: '#34C759',
+        padding: 15,
+        borderRadius: 10,
+        alignItems: 'center',
+    },
+    confirmButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: 'bold',
     },
     reportButton: {
         backgroundColor: '#34C759',

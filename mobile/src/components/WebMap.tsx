@@ -3,7 +3,7 @@
  * Uses OpenStreetMap tiles (free, no API key needed)
  */
 import React from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Circle, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -56,6 +56,30 @@ interface WebMapProps {
     };
     style?: React.CSSProperties;
     onMapClick?: (location: Location) => void;
+    onRegionChangeComplete?: (region: { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number }) => void;
+}
+
+// Component to handle map events
+function MapEvents({ onMapClick, onRegionChangeComplete }: { onMapClick?: (loc: Location) => void, onRegionChangeComplete?: (region: any) => void }) {
+    const map = useMapEvents({
+        click(e) {
+            if (onMapClick) onMapClick({ latitude: e.latlng.lat, longitude: e.latlng.lng });
+        },
+        moveend() {
+            if (onRegionChangeComplete) {
+                const center = map.getCenter();
+                // Calculate simple deltas based on zoom? Leaflet doesn't use deltas like RN-Maps.
+                // Just passing 0.01 placeholder for deltas as pure center is what matters for pin
+                onRegionChangeComplete({
+                    latitude: center.lat,
+                    longitude: center.lng,
+                    latitudeDelta: 0.01,
+                    longitudeDelta: 0.01
+                });
+            }
+        }
+    });
+    return null;
 }
 
 // Component to handle map center changes
@@ -74,6 +98,7 @@ export default function WebMap({
     circle,
     style,
     onMapClick,
+    onRegionChangeComplete,
 }: WebMapProps) {
     const getIcon = (color?: string) => {
         switch (color) {
@@ -97,6 +122,7 @@ export default function WebMap({
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
                 <MapCenterHandler center={center} />
+                <MapEvents onMapClick={onMapClick} onRegionChangeComplete={onRegionChangeComplete} />
 
                 {markers.map((marker, index) => (
                     <Marker
