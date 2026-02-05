@@ -1,0 +1,67 @@
+{
+  "expo": {
+    "name": "ParkPulse",
+    "slug": "parkpulse",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#007AFF"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.parkpulse.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "ParkPulse needs your location to report and find parking spots.",
+        "NSCameraUsageDescription": "ParkPulse needs camera access to take photos of parking spots.",
+        "NSPhotoLibraryUsageDescription": "ParkPulse needs photo library access to upload parking spot photos."
+      },
+      "config": {
+        "googleMapsApiKey": "AIzaSyDummy_Key_Replace_With_Real"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#007AFF"
+      },
+      "package": "com.parkpulse.app",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyDummy_Key_Replace_With_Real"
+        }
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow ParkPulse to use your location to report and find parking spots."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app needs access to your photos to upload parking spot images.",
+          "cameraPermission": "The app needs camera access to take photos of parking spots."
+        }
+      ]
+    ]
+  }
+}

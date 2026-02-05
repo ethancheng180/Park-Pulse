@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# NodeJS
+node_modules/
+npm-debug.log
+yarn-error.log
+yarn-debug.log
+
+# Expo
+.expo/
+web-build/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Mobile
+mobile/.env
+mobile/node_modules/
+mobile/.expo/
