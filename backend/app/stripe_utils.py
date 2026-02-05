@@ -5,7 +5,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from .config import get_settings
 from .models import User, Match, Payout
-from datetime import datetime
+from datetime import datetime, timezone
 
 settings = get_settings()
 
@@ -21,34 +21,13 @@ def create_payment_intent(
 ) -> dict:
     """
     Create a Stripe PaymentIntent for driver payment.
-    
-    Args:
-        amount: Amount in dollars
-        customer_id: Stripe customer ID (optional)
-        metadata: Additional metadata to attach
-    
-    Returns:
-        PaymentIntent object as dict
     """
-    if not settings.stripe_secret_key:
-        # Mock mode for development without Stripe
-        return {
-            "id": "pi_mock_" + str(datetime.utcnow().timestamp()),
-            "client_secret": "pi_mock_secret_123",
-            "status": "requires_payment_method"
-        }
-    
-    amount_cents = int(amount * 100)  # Convert to cents
-    
-    intent = stripe.PaymentIntent.create(
-        amount=amount_cents,
-        currency="usd",
-        customer=customer_id,
-        metadata=metadata or {},
-        capture_method="manual"  # Hold funds until verification
-    )
-    
-    return intent
+    # Always return mock for debugging
+    return {
+        "id": "pi_mock_simple",
+        "client_secret": "pi_mock_secret_simple",
+        "status": "requires_payment_method"
+    }
 
 
 def capture_payment(payment_intent_id: str) -> dict:
@@ -66,7 +45,7 @@ def refund_payment(payment_intent_id: str, reason: str = "requested_by_customer"
     """
     Refund a payment after failed verification or admin action.
     """
-    if not settings.stripe_secret_key:
+    if not settings.stripe_secret_key or "mock" in settings.stripe_secret_key:
         return {"id": "re_mock_123", "status": "succeeded"}
     
     # Get the payment intent to find the charge
@@ -117,7 +96,7 @@ def create_payout_to_pulser(
     db.commit()
     
     # Perform actual Stripe transfer (if Connect is set up)
-    if settings.stripe_secret_key and pulser.stripe_account_id:
+    if settings.stripe_secret_key and "mock" not in settings.stripe_secret_key and pulser.stripe_account_id:
         try:
             transfer = stripe.Transfer.create(
                 amount=int(pulser_amount * 100),  # Convert to cents
@@ -130,7 +109,7 @@ def create_payout_to_pulser(
             )
             payout.stripe_transfer_id = transfer.id
             payout.status = 'completed'
-            payout.completed_at = datetime.utcnow()
+            payout.completed_at = datetime.now(timezone.utc)
             db.commit()
         except stripe.error.StripeError as e:
             payout.status = 'failed'
@@ -139,7 +118,7 @@ def create_payout_to_pulser(
     else:
         # Mock mode - mark as completed
         payout.status = 'completed'
-        payout.completed_at = datetime.utcnow()
+        payout.completed_at = datetime.now(timezone.utc)
         db.commit()
     
     return payout
@@ -153,7 +132,7 @@ def ensure_stripe_customer(db: Session, user: User) -> str:
     if user.stripe_customer_id:
         return user.stripe_customer_id
     
-    if not settings.stripe_secret_key:
+    if not settings.stripe_secret_key or "mock" in settings.stripe_secret_key:
         # Mock mode
         customer_id = f"cus_mock_{user.id}"
         user.stripe_customer_id = customer_id

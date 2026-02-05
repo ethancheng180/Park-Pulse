@@ -2,7 +2,6 @@
 from sqlalchemy import Column, Integer, String, Numeric, Boolean, DateTime, ForeignKey, Text, CheckConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from geoalchemy2 import Geography
 from .database import Base
 
 
@@ -53,7 +52,8 @@ class Spot(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     pulser_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
-    location = Column(Geography(geometry_type="POINT", srid=4326), nullable=False)
+    latitude = Column(Numeric(10, 8), nullable=False)
+    longitude = Column(Numeric(11, 8), nullable=False)
     address = Column(Text)
     photo_url = Column(Text)
     reported_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -75,7 +75,8 @@ class Request(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     driver_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
-    destination = Column(Geography(geometry_type="POINT", srid=4326), nullable=False)
+    destination_latitude = Column(Numeric(10, 8), nullable=False)
+    destination_longitude = Column(Numeric(11, 8), nullable=False)
     destination_address = Column(Text)
     radius_meters = Column(Numeric(10, 2), nullable=False)
     max_price = Column(Numeric(10, 2), nullable=False)

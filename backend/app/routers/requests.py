@@ -28,30 +28,17 @@ def create_parking_request(
     db: Session = Depends(get_db)
 ):
     """Create a parking request and find best match."""
-    # Create request with PostGIS POINT
+    # Create request
     parking_request = Request(
         driver_id=current_user.id,
+        destination_latitude=request_data.destination_latitude,
+        destination_longitude=request_data.destination_longitude,
         destination_address=request_data.destination_address,
         radius_meters=request_data.radius_meters,
         max_price=request_data.max_price,
         status='pending'
     )
     db.add(parking_request)
-    db.flush()
-    
-    # Set destination using PostGIS
-    db.execute(
-        text("""
-            UPDATE requests
-            SET destination = ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography
-            WHERE id = :request_id
-        """),
-        {
-            "lat": request_data.destination_latitude,
-            "lng": request_data.destination_longitude,
-            "request_id": parking_request.id
-        }
-    )
     db.commit()
     db.refresh(parking_request)
     
@@ -72,9 +59,8 @@ def create_parking_request(
     spot, distance, score = match_result
     
     # For MVP, use simple flat pricing based on distance
-    # Could be made dynamic later
-    base_price = Decimal("3.00")  # $3 base
-    distance_price = Decimal(str(distance / 1000)) * Decimal("1.00")  # $1 per km
+    base_price = Decimal("3.00")
+    distance_price = Decimal(str(distance / 1000)) * Decimal("1.00")
     total_price = min(base_price + distance_price, request_data.max_price)
     
     # Create Stripe PaymentIntent
@@ -102,33 +88,22 @@ def create_parking_request(
     db.commit()
     db.refresh(match)
     
-    # Get spot coordinates for response
-    spot_coords = db.execute(
-        text("""
-            SELECT ST_Y(location::geometry) as lat, ST_X(location::geometry) as lng
-            FROM spots WHERE id = :spot_id
-        """),
-        {"spot_id": spot.id}
-    ).first()
-    
-    spot_response = SpotResponse(
-        id=spot.id,
-        pulser_id=spot.pulser_id,
-        latitude=spot_coords.lat,
-        longitude=spot_coords.lng,
-        address=spot.address,
-        photo_url=spot.photo_url,
-        reported_at=spot.reported_at,
-        expires_at=spot.expires_at,
-        status=spot.status
-    )
-    
     match_response = MatchResponse(
         id=match.id,
         spot_id=match.spot_id,
         distance_meters=match.distance_meters,
         amount=match.amount,
-        spot=spot_response,
+        spot=SpotResponse(
+            id=spot.id,
+            pulser_id=spot.pulser_id,
+            latitude=float(spot.latitude),
+            longitude=float(spot.longitude),
+            address=spot.address,
+            photo_url=spot.photo_url,
+            reported_at=spot.reported_at,
+            expires_at=spot.expires_at,
+            status=spot.status
+        ),
         stripe_client_secret=payment_intent.get("client_secret")
     )
     

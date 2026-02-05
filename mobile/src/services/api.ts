@@ -5,7 +5,14 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User, Spot, ParkingRequest, HistoryItem, LoginResponse } from '../types';
 
-const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:8000';
+// Use your computer's IP address instead of localhost for physical devices
+// Fallback logic incase .env loading fails
+const DEFAULT_API_URL = 'http://192.168.254.115:8000';
+const API_BASE_URL = process.env.API_BASE_URL || DEFAULT_API_URL;
+
+console.log('🌐 API Configuration:');
+console.log('  API_BASE_URL from env:', process.env.API_BASE_URL);
+console.log('  Using API_BASE_URL:', API_BASE_URL);
 
 const api = axios.create({
     baseURL: API_BASE_URL,
@@ -17,22 +24,49 @@ const api = axios.create({
 // Request interceptor to add auth token
 api.interceptors.request.use(
     async (config) => {
+        console.log('🔵 API Request:', config.method?.toUpperCase(), config.url);
+        console.log('🔵 Base URL:', config.baseURL);
+        console.log('🔵 Full URL:', `${config.baseURL}${config.url}`);
+        console.log('🔵 Request Data:', JSON.stringify(config.data, null, 2));
+
         const token = await AsyncStorage.getItem('access_token');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
+            console.log('🔑 Token added to request');
+        } else {
+            console.log('⚠️  No token found in storage');
         }
         return config;
     },
     (error) => {
+        console.error('❌ Request interceptor error:', error);
         return Promise.reject(error);
     }
 );
 
 // Response interceptor for error handling
 api.interceptors.response.use(
-    (response) => response,
+    (response) => {
+        console.log('✅ API Response:', response.status, response.config.url);
+        console.log('✅ Response Data:', JSON.stringify(response.data, null, 2));
+        return response;
+    },
     async (error) => {
+        console.error('❌ API Error Response:');
+        console.error('  URL:', error.config?.url);
+        console.error('  Method:', error.config?.method);
+        console.error('  Status:', error.response?.status);
+        console.error('  Status Text:', error.response?.statusText);
+        console.error('  Error Data:', JSON.stringify(error.response?.data, null, 2));
+        console.error('  Error Message:', error.message);
+
+        if (error.code === 'ERR_NETWORK') {
+            console.error('🔴 NETWORK ERROR: Cannot reach backend server');
+            console.error('  Make sure backend is running at:', API_BASE_URL);
+        }
+
         if (error.response?.status === 401) {
+            console.log('🔒 Token expired, clearing storage');
             // Token expired, clear storage
             await AsyncStorage.removeItem('access_token');
         }

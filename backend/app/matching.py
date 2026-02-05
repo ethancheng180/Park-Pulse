@@ -6,9 +6,27 @@ from sqlalchemy import and_, text
 from decimal import Decimal
 from .models import Spot, Request, Match, User, Reputation
 from .config import get_settings
-from geoalchemy2.functions import ST_Distance, ST_GeogFromText
 
 settings = get_settings()
+
+
+import math
+
+def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """
+    Calculate the great circle distance between two points 
+    on the earth (specified in decimal degrees)
+    """
+    # Convert decimal degrees to radians 
+    lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+
+    # Haversine formula 
+    dlon = lon2 - lon1 
+    dlat = lat2 - lat1 
+    a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+    c = 2 * math.asin(math.sqrt(a)) 
+    r = 6371000 # Radius of earth in meters
+    return c * r
 
 
 def calculate_score(
@@ -22,7 +40,7 @@ def calculate_score(
     score = distance_weight * meters + freshness_weight * seconds - reputation_weight * rating
     """
     score = (
-        settings.distance_weight * distance_meters +
+        settings.distance_weight * float(distance_meters) +
         settings.freshness_weight * seconds_since_report -
         settings.reputation_weight * pulser_rating
     )
@@ -40,19 +58,14 @@ def find_best_match(
         Tuple of (Spot, distance_meters, score) or None if no match found
     """
     # Calculate expiration cutoff
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     expiration_cutoff = now - timedelta(minutes=settings.spot_expiration_minutes)
     
-    # Get destination point as WKT
-    dest_lat = db.execute(text(
-        "SELECT ST_Y(destination::geometry) FROM requests WHERE id = :request_id"
-    ), {"request_id": request.id}).scalar()
+    # Get request coordinates
+    dest_lat = float(request.destination_latitude)
+    dest_lng = float(request.destination_longitude)
     
-    dest_lng = db.execute(text(
-        "SELECT ST_X(destination::geometry) FROM requests WHERE id = :request_id"
-    ), {"request_id": request.id}).scalar()
-    
-    # Query available spots within radius
+    # Query available spots within reasonable timeframe
     query = db.query(
         Spot,
         User,
@@ -72,31 +85,11 @@ def find_best_match(
     # Get all candidates and calculate distances
     candidates = []
     for spot, user, reputation in query.all():
-        # Get spot coordinates
-        spot_coords = db.execute(text(
-            """
-            SELECT ST_Y(location::geometry) as lat, ST_X(location::geometry) as lng
-            FROM spots WHERE id = :spot_id
-            """
-        ), {"spot_id": spot.id}).first()
-        
-        if not spot_coords:
-            continue
-        
-        # Calculate distance using PostGIS
-        distance = db.execute(text(
-            """
-            SELECT ST_Distance(
-                ST_SetSRID(ST_MakePoint(:lng1, :lat1), 4326)::geography,
-                ST_SetSRID(ST_MakePoint(:lng2, :lat2), 4326)::geography
-            )
-            """
-        ), {
-            "lat1": dest_lat,
-            "lng1": dest_lng,
-            "lat2": spot_coords.lat,
-            "lng2": spot_coords.lng
-        }).scalar()
+        # Calculate distance using Haversine
+        distance = haversine_distance(
+            dest_lat, dest_lng, 
+            float(spot.latitude), float(spot.longitude)
+        )
         
         # Check if within radius
         if distance > float(request.radius_meters):

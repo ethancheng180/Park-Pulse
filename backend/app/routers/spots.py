@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List
 from ..database import get_db
 from ..models import User, Spot
@@ -38,50 +38,28 @@ def report_spot(
         )
     
     # Calculate expiration time
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     expires_at = now + timedelta(minutes=settings.spot_expiration_minutes)
     
-    # Create spot with PostGIS POINT
+    # Create spot
     spot = Spot(
         pulser_id=current_user.id,
+        latitude=spot_data.latitude,
+        longitude=spot_data.longitude,
         address=spot_data.address,
         photo_url=spot_data.photo_url,
         expires_at=expires_at,
         status='available'
     )
     db.add(spot)
-    db.flush()  # Get the ID before setting location
-    
-    # Update location using raw SQL (PostGIS)
-    db.execute(
-        text("""
-            UPDATE spots 
-            SET location = ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography
-            WHERE id = :spot_id
-        """),
-        {
-            "lat": spot_data.latitude,
-            "lng": spot_data.longitude,
-            "spot_id": spot.id
-        }
-    )
     db.commit()
     db.refresh(spot)
-    
-    # Get coordinates for response
-    coords = db.execute(
-        text("""
-            SELECT ST_Y(location::geometry) as lat, ST_X(location::geometry) as lng
-            FROM spots WHERE id = :spot_id
-        """),
-        {"spot_id": spot.id}
-    ).first()
     
     return SpotResponse(
         id=spot.id,
         pulser_id=spot.pulser_id,
-        latitude=coords.lat,
-        longitude=coords.lng,
+        latitude=float(spot.latitude),
+        longitude=float(spot.longitude),
         address=spot.address,
         photo_url=spot.photo_url,
         reported_at=spot.reported_at,
@@ -102,19 +80,11 @@ def get_my_spots(
     
     result = []
     for spot in spots:
-        coords = db.execute(
-            text("""
-                SELECT ST_Y(location::geometry) as lat, ST_X(location::geometry) as lng
-                FROM spots WHERE id = :spot_id
-            """),
-            {"spot_id": spot.id}
-        ).first()
-        
         result.append(SpotResponse(
             id=spot.id,
             pulser_id=spot.pulser_id,
-            latitude=coords.lat,
-            longitude=coords.lng,
+            latitude=float(spot.latitude),
+            longitude=float(spot.longitude),
             address=spot.address,
             photo_url=spot.photo_url,
             reported_at=spot.reported_at,

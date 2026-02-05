@@ -17,6 +17,8 @@ import { spotAPI } from '../services/api';
 import { Spot, Location } from '../types';
 import UnifiedMap from '../components/UnifiedMap';
 
+console.log('🚀 PulserScreen loaded');
+
 export default function PulserScreen() {
     const [spots, setSpots] = useState<Spot[]>([]);
     const [loading, setLoading] = useState(false);
@@ -163,14 +165,39 @@ export default function PulserScreen() {
         address: string,
         photo_url?: string
     ) => {
+        console.log('📍 Submitting spot:', { latitude, longitude, address, photo_url });
+
         try {
-            await spotAPI.reportSpot(latitude, longitude, address, photo_url);
-            Alert.alert('Success', 'Parking spot reported!');
+            setLoading(true);
+            const result = await spotAPI.reportSpot(latitude, longitude, address, photo_url);
+            console.log('✅ Spot reported successfully:', result);
+
+            Alert.alert('Success', 'Parking spot reported!\n\nRefreshing your reports...');
             await loadSpots();
         } catch (error: any) {
+            console.error('❌ Failed to submit spot:', error);
+
+            let errorMessage = 'Failed to report spot';
+
+            if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+                errorMessage = 'Cannot connect to server.\n\nMake sure the backend is running and your device is on the same network.';
+            } else if (error.response?.status === 401) {
+                errorMessage = 'Authentication failed. Please log in again.';
+            } else if (error.response?.status === 400) {
+                errorMessage = error.response?.data?.detail || 'Invalid spot data. Please try again.';
+            } else if (error.response?.data?.detail) {
+                errorMessage = error.response.data.detail;
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
+
             Alert.alert(
-                'Error',
-                error.response?.data?.detail || 'Failed to report spot'
+                'Error Reporting Spot',
+                errorMessage,
+                [
+                    { text: 'OK', style: 'default' },
+                    { text: 'Retry', onPress: () => submitSpot(latitude, longitude, address, photo_url) }
+                ]
             );
         } finally {
             setLoading(false);

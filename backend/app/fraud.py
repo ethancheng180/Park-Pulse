@@ -1,6 +1,5 @@
-"""Fraud detection and prevention utilities."""
 from typing import Tuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from .models import User, Spot, Reputation
 import hashlib
@@ -45,7 +44,7 @@ def check_photo_reuse(db: Session, photo_url: str, user_id: int) -> bool:
     photo_hash = hashlib.md5(photo_url.encode()).hexdigest()
     
     # Check if this hash was used recently by this user
-    recent_cutoff = datetime.utcnow() - timedelta(days=7)
+    recent_cutoff = datetime.now(timezone.utc) - timedelta(days=7)
     existing_spots = db.query(Spot).filter(
         Spot.pulser_id == user_id,
         Spot.created_at > recent_cutoff,
@@ -67,7 +66,7 @@ def check_rate_limit(db: Session, user_id: int, window_minutes: int = 10, max_re
     Returns:
         (is_allowed, error_message)
     """
-    cutoff = datetime.utcnow() - timedelta(minutes=window_minutes)
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=window_minutes)
     
     recent_reports = db.query(Spot).filter(
         Spot.pulser_id == user_id,
