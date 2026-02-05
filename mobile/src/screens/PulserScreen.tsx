@@ -146,14 +146,16 @@ export default function PulserScreen() {
             if (!result.canceled && result.assets[0]) {
                 const tempUri = result.assets[0].uri;
 
-                // Save to permanent local storage
+                // Try to save to permanent storage, but fallback to tempUri if it fails
                 const savedUri = await savePhotoToStorage(tempUri);
 
                 if (savedUri) {
                     setPhotoUri(savedUri);
                     console.log('📸 Photo saved:', savedUri);
                 } else {
-                    Alert.alert('Error', 'Failed to save photo. Please try again.');
+                    // Fallback to temp URI so user can still proceed
+                    console.warn('⚠️ Saving failed, using temp URI');
+                    setPhotoUri(tempUri);
                 }
             }
         } catch (error) {
@@ -165,8 +167,16 @@ export default function PulserScreen() {
     // Save photo to local storage for persistence
     const savePhotoToStorage = async (tempUri: string): Promise<string | null> => {
         try {
+            // Use document directory or cache directory as fallback
+            const directory = FileSystem.documentDirectory || FileSystem.cacheDirectory;
+
+            if (!directory) {
+                console.error('FileSystem directory is null');
+                return null;
+            }
+
             const fileName = `spot_photo_${Date.now()}.jpg`;
-            const destinationUri = `${FileSystem.documentDirectory}${fileName}`;
+            const destinationUri = `${directory}${fileName}`;
 
             await FileSystem.copyAsync({
                 from: tempUri,
@@ -174,8 +184,10 @@ export default function PulserScreen() {
             });
 
             return destinationUri;
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error saving photo:', error);
+            // Show the actual error message for debugging
+            Alert.alert('Photo Save Error', error.message || 'Unknown file system error');
             return null;
         }
     };
