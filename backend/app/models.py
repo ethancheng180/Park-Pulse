@@ -22,7 +22,7 @@ class User(Base):
     
     # Relationships
     reputation = relationship("Reputation", back_populates="user", uselist=False)
-    spots = relationship("Spot", back_populates="pulser")
+    spots = relationship("Spot", back_populates="pulser", foreign_keys="[Spot.pulser_id]")
     requests = relationship("Request", back_populates="driver")
     
     __table_args__ = (
@@ -65,12 +65,19 @@ class Spot(Base):
     status = Column(String(20), default="available")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
+    # Claim fields
+    claimed_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    claimed_at = Column(DateTime(timezone=True), nullable=True)
+    claim_expires_at = Column(DateTime(timezone=True), nullable=True)
+    taken_confirmed_at = Column(DateTime(timezone=True), nullable=True)
+    
     # Relationships
-    pulser = relationship("User", back_populates="spots")
+    pulser = relationship("User", foreign_keys=[pulser_id], back_populates="spots")
+    claimer = relationship("User", foreign_keys=[claimed_by_user_id])
     matches = relationship("Match", back_populates="spot")
     
     __table_args__ = (
-        CheckConstraint("status IN ('available', 'matched', 'verified', 'expired', 'failed')", name="check_spot_status"),
+        CheckConstraint("status IN ('available', 'matched', 'verified', 'expired', 'failed', 'claimed', 'taken')", name="check_spot_status"),
     )
 
 

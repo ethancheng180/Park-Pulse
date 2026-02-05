@@ -32,7 +32,11 @@ export interface Spot {
     reported_at: string;
     expires_at: string;
     price?: number;
-    status: 'available' | 'matched' | 'verified' | 'expired' | 'failed';
+    status: 'available' | 'matched' | 'verified' | 'expired' | 'failed' | 'claimed' | 'taken';
+    claimed_by_user_id?: number;
+    claimed_at?: string;
+    claim_expires_at?: string;
+    taken_confirmed_at?: string;
 }
 
 export interface Match {

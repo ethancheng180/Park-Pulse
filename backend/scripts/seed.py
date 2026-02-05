@@ -3,7 +3,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.database import SessionLocal
+from app.database import SessionLocal, engine, Base
 from app.models import User, Spot, Reputation
 from app.auth import get_password_hash
 from sqlalchemy import text
@@ -11,18 +11,15 @@ from datetime import datetime, timedelta
 
 def seed_database():
     """Seed the database with test data."""
+    # Recreate tables to apply schema changes
+    print("Recreating database schema...")
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+    
     db = SessionLocal()
     
     try:
         print("Seeding database...")
-        
-        # Clear existing data to prevent zombies
-        print("Clearing existing data...")
-        db.query(Spot).delete()
-        db.query(Reputation).delete()
-        db.query(User).delete()
-        db.commit()
-        print("✓ Tables cleared")
         
         # Create test users
         print("Creating test users...")

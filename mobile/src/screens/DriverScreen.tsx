@@ -30,7 +30,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { BlurView } from 'expo-blur';
 import { locationService } from '../services/location';
-import { spotAPI } from '../services/api';
+import { spotAPI, userAPI } from '../services/api';
 import { Spot, Location } from '../types';
 import UnifiedMap from '../components/UnifiedMap';
 import { COLORS, SPACING, SHADOWS, RADIUS, TYPOGRAPHY } from '../theme';
@@ -49,6 +49,7 @@ export default function DriverScreen() {
     const [filteredSpots, setFilteredSpots] = useState<Spot[]>([]); // View Model
     const [userLocation, setUserLocation] = useState<Location | null>(null);
     const [refreshing, setRefreshing] = useState(false);
+    const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
     // Filters
     const [maxPrice, setMaxPrice] = useState(15);
@@ -104,6 +105,7 @@ export default function DriverScreen() {
     useEffect(() => {
         getCurrentLocation();
         fetchSpots(); // Initial fetch
+        fetchCurrentUser();
     }, []);
 
     // Re-fetch on Tab Focus to ensure we see Pulser updates
@@ -123,6 +125,13 @@ export default function DriverScreen() {
             const loc = await locationService.getCurrentLocation();
             setUserLocation(loc);
         } catch (e) { console.error(e); }
+    };
+
+    const fetchCurrentUser = async () => {
+        try {
+            const me = await userAPI.getMe();
+            setCurrentUserId(me.id);
+        } catch (e) { console.log('Error fetching user', e); }
     };
 
     const fetchSpots = async () => {
@@ -191,6 +200,45 @@ export default function DriverScreen() {
             Haptics.selectionAsync();
             snapTo(SNAP_MID);
         }
+    };
+
+    // --- CLAIM FLOW ---
+    const handleClaimSpot = async () => {
+        if (!selectedSpot) return;
+        try {
+            const updated = await spotAPI.claimSpot(selectedSpot.id);
+            updateLocalSpot(updated);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } catch (e) {
+            alert('Failed to claim spot. It may be picked up.');
+            fetchSpots();
+        }
+    };
+
+    const handleConfirmTaken = async () => {
+        if (!selectedSpot) return;
+        try {
+            const updated = await spotAPI.markSpotTaken(selectedSpot.id);
+            updateLocalSpot(updated);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            setTimeout(() => {
+                setSelectedSpot(null);
+                snapTo(SNAP_BOTTOM);
+            }, 1000);
+        } catch (e) { alert('Action failed'); }
+    };
+
+    const handleReleaseClaim = async () => {
+        if (!selectedSpot) return;
+        try {
+            const updated = await spotAPI.releaseSpot(selectedSpot.id);
+            updateLocalSpot(updated);
+        } catch (e) { alert('Action failed'); }
+    };
+
+    const updateLocalSpot = (updated: Spot) => {
+        setAllSpots(prev => prev.map(s => s.id === updated.id ? updated : s));
+        setSelectedSpot(updated);
     };
 
     // --- RENDER ---
@@ -325,11 +373,27 @@ export default function DriverScreen() {
                                     <View>
                                         <Text style={TYPOGRAPHY.h2}>Spot Details</Text>
                                         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-                                            <View style={{ backgroundColor: COLORS.success, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginRight: 8 }}>
-                                                <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>ACTIVE</Text>
-                                            </View>
+                                            {selectedSpot.status === 'available' && (
+                                                <View style={{ backgroundColor: COLORS.success, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginRight: 8 }}>
+                                                    <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>ACTIVE</Text>
+                                                </View>
+                                            )}
+                                            {selectedSpot.status === 'claimed' && (
+                                                <View style={{ backgroundColor: COLORS.warning, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginRight: 8 }}>
+                                                    <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>CLAIMED</Text>
+                                                </View>
+                                            )}
+                                            {selectedSpot.status === 'taken' && (
+                                                <View style={{ backgroundColor: COLORS.text.secondary, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginRight: 8 }}>
+                                                    <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>TAKEN</Text>
+                                                </View>
+                                            )}
+
                                             <Text style={TYPOGRAPHY.caption}>
-                                                Ends in {Math.ceil((new Date(selectedSpot.expires_at).getTime() - Date.now()) / 60000)}m
+                                                {selectedSpot.status === 'claimed' && selectedSpot.claim_expires_at
+                                                    ? `Claim expires in ${Math.ceil((new Date(selectedSpot.claim_expires_at).getTime() - Date.now()) / 1000)}s`
+                                                    : `Ends in ${Math.ceil((new Date(selectedSpot.expires_at).getTime() - Date.now()) / 60000)}m`
+                                                }
                                             </Text>
                                         </View>
                                     </View>
@@ -369,6 +433,31 @@ export default function DriverScreen() {
                                         Linking.openURL(link);
                                     }}
                                 />
+
+                                {selectedSpot.status === 'available' && (
+                                    <Button
+                                        title="Claim Spot"
+                                        style={{ marginTop: SPACING.s, backgroundColor: COLORS.primary }}
+                                        onPress={handleClaimSpot}
+                                    />
+                                )}
+
+                                {selectedSpot.status === 'claimed' && selectedSpot.claimed_by_user_id === currentUserId && (
+                                    <View>
+                                        <Button
+                                            title="Mark as Taken"
+                                            style={{ marginTop: SPACING.s, backgroundColor: COLORS.success }}
+                                            onPress={handleConfirmTaken}
+                                        />
+                                        <Button
+                                            title="Release Claim"
+                                            variant="outline"
+                                            style={{ marginTop: SPACING.s, borderColor: COLORS.error }}
+                                            textStyle={{ color: COLORS.error }}
+                                            onPress={handleReleaseClaim}
+                                        />
+                                    </View>
+                                )}
                                 <Button
                                     title="Close"
                                     variant="outline"
@@ -391,7 +480,7 @@ export default function DriverScreen() {
                 </View>
             </Animated.View>
 
-            {/* Price Filter Modal (Native-ish Sheet) */}
+            {/* Price Filter Modal */}
             <Modal visible={showPriceFilter} animationType="fade" transparent>
                 <TouchableOpacity
                     style={styles.modalBackdrop}
@@ -429,6 +518,7 @@ export default function DriverScreen() {
                     </View>
                 </TouchableOpacity>
             </Modal>
+
             {/* Full Screen Photo Modal */}
             <Modal visible={showPhotoModal} animationType="fade" transparent={true}>
                 <View style={{ flex: 1, backgroundColor: 'black', justifyContent: 'center' }}>

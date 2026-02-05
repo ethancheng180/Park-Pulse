@@ -149,6 +149,21 @@ export const spotAPI = {
     async deleteSpot(id: number): Promise<void> {
         await api.delete(`/spots/${id}`);
     },
+
+    async claimSpot(id: number): Promise<Spot> {
+        const response = await api.post<Spot>(`/spots/${id}/claim`);
+        return response.data;
+    },
+
+    async markSpotTaken(id: number): Promise<Spot> {
+        const response = await api.post<Spot>(`/spots/${id}/take`);
+        return response.data;
+    },
+
+    async releaseSpot(id: number): Promise<Spot> {
+        const response = await api.post<Spot>(`/spots/${id}/release`);
+        return response.data;
+    },
 };
 
 // Request API

@@ -69,6 +69,10 @@ class SpotResponse(BaseModel):
     reported_at: datetime
     expires_at: datetime
     status: str
+    claimed_by_user_id: Optional[int] = None
+    claimed_at: Optional[datetime] = None
+    claim_expires_at: Optional[datetime] = None
+    taken_confirmed_at: Optional[datetime] = None
     
     model_config = ConfigDict(from_attributes=True)
 

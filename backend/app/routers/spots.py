@@ -7,7 +7,7 @@ from typing import List
 from ..database import get_db
 from ..models import User, Spot
 from ..schemas import SpotCreate, SpotResponse
-from ..auth import get_current_pulser
+from ..auth import get_current_pulser, get_current_user
 from ..fraud import validate_spot_report
 from ..config import get_settings
 
@@ -149,3 +149,83 @@ def delete_spot(
     db.delete(spot)
     db.commit()
     return None
+
+
+@router.post("/{spot_id}/claim", response_model=SpotResponse)
+def claim_spot(
+    spot_id: int,
+    current_user: User = Depends(get_current_user),  # Any auth user can claim for MVP
+    db: Session = Depends(get_db)
+):
+    """Claim a spot (Atomic)."""
+    # Select for update to prevent race conditions
+    spot = db.query(Spot).filter(Spot.id == spot_id).with_for_update().first()
+    
+    if not spot:
+        raise HTTPException(status_code=404, detail="Spot not found")
+        
+    if spot.status != 'available':
+        raise HTTPException(status_code=409, detail="Spot is no longer available")
+        
+    now = datetime.now(timezone.utc)
+    if spot.expires_at < now:
+         raise HTTPException(status_code=400, detail="Spot has expired")
+
+    # Update state
+    spot.status = 'claimed'
+    spot.claimed_by_user_id = current_user.id
+    spot.claimed_at = now
+    spot.claim_expires_at = now + timedelta(minutes=2)
+    
+    db.commit()
+    db.refresh(spot)
+    return spot
+
+
+@router.post("/{spot_id}/take", response_model=SpotResponse)
+def mark_spot_taken(
+    spot_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Confirm spot is taken."""
+    spot = db.query(Spot).filter(Spot.id == spot_id).first()
+    
+    if not spot:
+        raise HTTPException(status_code=404, detail="Spot not found")
+        
+    if spot.claimed_by_user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized (not the claimer)")
+        
+    spot.status = 'taken'
+    spot.taken_confirmed_at = datetime.now(timezone.utc)
+    
+    db.commit()
+    db.refresh(spot)
+    return spot
+
+
+@router.post("/{spot_id}/release", response_model=SpotResponse)
+def release_spot(
+    spot_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Release a claim."""
+    spot = db.query(Spot).filter(Spot.id == spot_id).first()
+    
+    if not spot:
+        raise HTTPException(status_code=404, detail="Spot not found")
+        
+    if spot.claimed_by_user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized (not the claimer)")
+        
+    # Revert to available
+    spot.status = 'available'
+    spot.claimed_by_user_id = None
+    spot.claimed_at = None
+    spot.claim_expires_at = None
+    
+    db.commit()
+    db.refresh(spot)
+    return spot
