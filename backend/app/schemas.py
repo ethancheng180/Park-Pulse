@@ -57,6 +57,7 @@ class SpotCreate(BaseModel):
     longitude: float = Field(ge=-180, le=180)
     address: Optional[str] = None
     photo_url: Optional[str] = None
+    price: Optional[float] = Field(default=5.0, ge=1, le=100)
 
 
 class SpotResponse(BaseModel):
@@ -69,6 +70,8 @@ class SpotResponse(BaseModel):
     reported_at: datetime
     expires_at: datetime
     status: str
+    price: Optional[float] = None
+    confidence: Optional[str] = None  # 'Low', 'Medium', 'High'
     claimed_by_user_id: Optional[int] = None
     claimed_at: Optional[datetime] = None
     claim_expires_at: Optional[datetime] = None

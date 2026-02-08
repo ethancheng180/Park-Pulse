@@ -60,6 +60,7 @@ class Spot(Base):
     longitude = Column(Numeric(11, 8), nullable=False)
     address = Column(Text)
     photo_url = Column(Text)
+    price = Column(Numeric(10, 2), default=5.00)  # Driver-set price
     reported_at = Column(DateTime(timezone=True), server_default=func.now())
     expires_at = Column(DateTime(timezone=True), nullable=False)
     status = Column(String(20), default="available")

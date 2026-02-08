@@ -8,7 +8,7 @@ settings = get_settings()
 
 # Create SQLAlchemy engine
 engine = create_engine(
-    settings.database_url,
+    settings.sync_database_url,
     pool_pre_ping=True,
     echo=settings.environment == "development"
 )

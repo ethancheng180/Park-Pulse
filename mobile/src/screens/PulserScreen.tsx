@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
+import Slider from '@react-native-community/slider';
 import { Swipeable, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { locationService } from '../services/location';
 import { spotAPI } from '../services/api';
@@ -41,6 +42,7 @@ export default function PulserScreen() {
     const [pinnedAddress, setPinnedAddress] = useState('');
     const [isGeocoding, setIsGeocoding] = useState(false);
     const [photoUri, setPhotoUri] = useState<string | null>(null);
+    const [price, setPrice] = useState(5); // Default price $5
 
     // Debounce for geocoding
     const geocodeTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -146,7 +148,8 @@ export default function PulserScreen() {
                 pinnedLocation.latitude,
                 pinnedLocation.longitude,
                 pinnedAddress,
-                photoUri || undefined
+                photoUri || undefined,
+                price
             );
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             setIsReporting(false);
@@ -286,6 +289,30 @@ export default function PulserScreen() {
                                     ) : (
                                         <Text style={{ color: COLORS.text.secondary, fontStyle: 'italic' }}>No photo added</Text>
                                     )}
+
+                                    <Text style={[TYPOGRAPHY.caption, { marginTop: SPACING.l }]}>PRICE</Text>
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: SPACING.s }}>
+                                        <Text style={TYPOGRAPHY.body}>Set your price:</Text>
+                                        <Text style={[TYPOGRAPHY.h2, { color: COLORS.success }]}>${price}</Text>
+                                    </View>
+                                    <Slider
+                                        style={{ width: '100%', height: 40, marginTop: SPACING.s }}
+                                        minimumValue={1}
+                                        maximumValue={20}
+                                        step={1}
+                                        value={price}
+                                        onValueChange={(val: number) => {
+                                            setPrice(val);
+                                            if (val % 5 === 0) Haptics.selectionAsync();
+                                        }}
+                                        minimumTrackTintColor={COLORS.success}
+                                        maximumTrackTintColor={COLORS.border}
+                                        thumbTintColor="white"
+                                    />
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                        <Text style={TYPOGRAPHY.caption}>$1</Text>
+                                        <Text style={TYPOGRAPHY.caption}>$20</Text>
+                                    </View>
                                 </View>
                                 <View style={{ flex: 1 }} />
                                 <Button title="Submit Report" onPress={handleSubmit} />

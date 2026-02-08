@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     # Google Maps
     google_maps_api_key: str = ""
     
+    # Google OAuth
+    google_client_id: str = ""
+    
     # App Config
     environment: str = "development"
     platform_fee_percent: int = 20
@@ -35,6 +38,13 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False
+
+    @property
+    def sync_database_url(self) -> str:
+        """Ensure database URL is compatible with SQLAlchemy."""
+        if self.database_url and self.database_url.startswith("postgres://"):
+            return self.database_url.replace("postgres://", "postgresql://", 1)
+        return self.database_url
 
 
 @lru_cache()

@@ -144,13 +144,15 @@ export const spotAPI = {
         latitude: number,
         longitude: number,
         address?: string,
-        photo_url?: string
+        photo_url?: string,
+        price?: number
     ): Promise<Spot> {
         const response = await api.post<Spot>('/spots', {
             latitude,
             longitude,
             address,
             photo_url,
+            price,
         });
         return response.data;
     },

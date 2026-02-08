@@ -67,6 +67,9 @@ export default function DriverScreen() {
     const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
     const [showPhotoModal, setShowPhotoModal] = useState(false);
 
+    // Live countdown timer for claimed spots
+    const [claimCountdown, setClaimCountdown] = useState<number | null>(null);
+
     // --- ANIMATIONS ---
     const panY = useRef(new Animated.Value(SNAP_BOTTOM)).current;
 
@@ -114,6 +117,25 @@ export default function DriverScreen() {
             fetchSpots();
         }, [])
     );
+
+    // Live countdown timer effect
+    useEffect(() => {
+        if (selectedSpot?.status === 'claimed' && selectedSpot.claim_expires_at) {
+            const updateCountdown = () => {
+                const remaining = Math.ceil(
+                    (new Date(selectedSpot.claim_expires_at!).getTime() - Date.now()) / 1000
+                );
+                setClaimCountdown(remaining > 0 ? remaining : 0);
+            };
+
+            updateCountdown(); // Initial update
+            const interval = setInterval(updateCountdown, 1000);
+
+            return () => clearInterval(interval);
+        } else {
+            setClaimCountdown(null);
+        }
+    }, [selectedSpot]);
 
     // Filter Logic: Runs whenever allSpots or maxPrice changes
     useEffect(() => {
@@ -390,8 +412,8 @@ export default function DriverScreen() {
                                             )}
 
                                             <Text style={TYPOGRAPHY.caption}>
-                                                {selectedSpot.status === 'claimed' && selectedSpot.claim_expires_at
-                                                    ? `Claim expires in ${Math.ceil((new Date(selectedSpot.claim_expires_at).getTime() - Date.now()) / 1000)}s`
+                                                {selectedSpot.status === 'claimed' && claimCountdown !== null
+                                                    ? `Claim expires in ${claimCountdown}s`
                                                     : `Ends in ${Math.ceil((new Date(selectedSpot.expires_at).getTime() - Date.now()) / 60000)}m`
                                                 }
                                             </Text>
@@ -404,7 +426,11 @@ export default function DriverScreen() {
 
                                 <View style={{ marginVertical: SPACING.m }}>
                                     <Text style={TYPOGRAPHY.body}>{selectedSpot.address}</Text>
-                                    <Text style={TYPOGRAPHY.caption}>Confidence: High • Reported 2m ago</Text>
+                                    <Text style={TYPOGRAPHY.caption}>
+                                        Confidence: {selectedSpot.confidence || 'Medium'} • Reported {
+                                            Math.round((Date.now() - new Date(selectedSpot.reported_at).getTime()) / 60000)
+                                        }m ago
+                                    </Text>
                                 </View>
 
                                 {selectedSpot.photo_url ? (
