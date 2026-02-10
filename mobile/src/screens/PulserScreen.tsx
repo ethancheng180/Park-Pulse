@@ -137,18 +137,31 @@ export default function PulserScreen() {
 
     const handleSubmit = async () => {
         if (!pinnedLocation) return;
+
+        // Show loading state? 
+        // Ideally we should have a loading state variable, but we'll use Alert for now if it takes too long
+
         try {
+            let finalPhotoUrl = undefined;
+
+            if (photoUri) {
+                // Upload image first
+                // We could add a toast here "Uploading photo..."
+                finalPhotoUrl = await import('../services/api').then(m => m.uploadAPI.uploadImage(photoUri));
+            }
+
             console.log('Submitting Spot:', {
                 lat: pinnedLocation.latitude,
                 lon: pinnedLocation.longitude,
-                addr: pinnedAddress
+                addr: pinnedAddress,
+                photo: finalPhotoUrl
             });
 
             await spotAPI.reportSpot(
                 pinnedLocation.latitude,
                 pinnedLocation.longitude,
                 pinnedAddress,
-                photoUri || undefined,
+                finalPhotoUrl,
                 price
             );
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

@@ -8,7 +8,7 @@ import { authEvents } from '../utils/authEvents';
 
 // Use your computer's IP address instead of localhost for physical devices
 // Fallback logic incase .env loading fails
-const DEFAULT_API_URL = 'http://192.168.254.115:8000';
+const DEFAULT_API_URL = 'http://192.168.1.192:8000';
 const API_BASE_URL = process.env.API_BASE_URL || DEFAULT_API_URL;
 
 console.log('🌐 API Configuration:');
@@ -213,6 +213,34 @@ export const requestAPI = {
             notes,
         });
         return response.data;
+    },
+};
+
+// Upload API
+export const uploadAPI = {
+    async uploadImage(uri: string): Promise<string> {
+        const formData = new FormData();
+
+        // Infer filename and type
+        const filename = uri.split('/').pop() || 'photo.jpg';
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : `image/jpeg`;
+
+        formData.append('file', { uri, name: filename, type } as any);
+
+        const response = await api.post<{ url: string }>('/upload/image', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+
+        // Ensure we return a full URL if the backend returns a relative one
+        const url = response.data.url;
+        if (url.startsWith('http')) return url;
+
+        // Prepend API_BASE_URL (removing trailing slash if needed)
+        const baseUrl = api.defaults.baseURL?.replace(/\/$/, '') || '';
+        return `${baseUrl}${url}`;
     },
 };
 

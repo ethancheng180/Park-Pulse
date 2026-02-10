@@ -1,0 +1,887 @@
+
+> mobile@1.0.0 start
+> expo start
+
+env: load .env
+env: export API_BASE_URL STRIPE_PUBLISHABLE_KEY GOOGLE_MAPS_API_KEY
+Starting project at /Users/ethancheng/.gemini/antigravity/scratch/parkpulse-v0/mobile
+Starting Metro Bundler
+Waiting on http://localhost:8081
+Logs for your project will appear below.
+Unable to resolve asset "./assets/splash.png" from "splash.image" in your app.json or app.config.js
+iOS ./index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+iOS ./index.ts ▓▓▓▓▓▓▓▓░░░░░░░░ 51.5% (463/645)
+iOS Bundled 7012ms index.ts (1126 modules)
+iOS ./index.ts ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (1126/1126)
+ LOG  🌐 API Configuration:
+ LOG    API_BASE_URL from env: undefined
+ LOG    Using API_BASE_URL: http://192.168.254.115:8000
+ WARN  SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/th3rdwave/react-native-safe-area-context
+ LOG  Fetching spots from backend...
+ LOG  Fetching spots from backend...
+ LOG  Applied filters: MaxPrice=15. Result: 0 spots.
+ LOG  🔵 API Request: GET /spots/available
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/spots/available
+ LOG  🔵 Request Data: undefined
+ LOG  🔵 API Request: GET /users/me
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/users/me
+ LOG  🔵 Request Data: undefined
+ LOG  🔵 API Request: GET /spots/available
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/spots/available
+ LOG  🔵 Request Data: undefined
+ LOG  🔑 Token added to request
+ LOG  🔑 Token added to request
+ LOG  🔑 Token added to request
+ LOG  🔵 API Request: GET /spots
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/spots
+ LOG  🔵 Request Data: undefined
+ LOG  🔑 Token added to request
+ LOG  Fetching spots from backend...
+ LOG  🔵 API Request: GET /spots/available
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/spots/available
+ LOG  🔵 Request Data: undefined
+ LOG  🔑 Token added to request
+ LOG  Fetching spots from backend...
+ LOG  🔵 API Request: GET /spots/available
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/spots/available
+ LOG  🔵 Request Data: undefined
+ LOG  🔑 Token added to request
+ LOG  Submitting Spot: {"addr": "917–929 Carroll St, New York, NY", "lat": 40.66836559200441, "lon": -73.96038475114938}
+ LOG  🔵 API Request: POST /spots
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/spots
+ LOG  🔵 Request Data: {
+  "latitude": 40.66836559200441,
+  "longitude": -73.96038475114938,
+  "address": "917–929 Carroll St, New York, NY",
+  "price": 20
+}
+ LOG  🔑 Token added to request
+ LOG  Submitting Spot: {"addr": "917–929 Carroll St, New York, NY", "lat": 40.66836559200441, "lon": -73.96038475114938}
+ LOG  🔵 API Request: POST /spots
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/spots
+ LOG  🔵 Request Data: {
+  "latitude": 40.66836559200441,
+  "longitude": -73.96038475114938,
+  "address": "917–929 Carroll St, New York, NY",
+  "price": 20
+}
+ LOG  🔑 Token added to request
+ LOG  Submitting Spot: {"addr": "917–929 Carroll St, New York, NY", "lat": 40.66836559200441, "lon": -73.96038475114938}
+ LOG  🔵 API Request: POST /spots
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/spots
+ LOG  🔵 Request Data: {
+  "latitude": 40.66836559200441,
+  "longitude": -73.96038475114938,
+  "address": "917–929 Carroll St, New York, NY",
+  "price": 20
+}
+ LOG  🔑 Token added to request
+ LOG  Submitting Spot: {"addr": "917–929 Carroll St, New York, NY", "lat": 40.66836559200441, "lon": -73.96038475114938}
+ LOG  🔵 API Request: POST /spots
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/spots
+ LOG  🔵 Request Data: {
+  "latitude": 40.66836559200441,
+  "longitude": -73.96038475114938,
+  "address": "917–929 Carroll St, New York, NY",
+  "price": 20
+}
+ LOG  🔑 Token added to request
+ LOG  Submitting Spot: {"addr": "917–929 Carroll St, New York, NY", "lat": 40.66836559200441, "lon": -73.96038475114938}
+ LOG  🔵 API Request: POST /spots
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/spots
+ LOG  🔵 Request Data: {
+  "latitude": 40.66836559200441,
+  "longitude": -73.96038475114938,
+  "address": "917–929 Carroll St, New York, NY",
+  "price": 20
+}
+ LOG  🔑 Token added to request
+ LOG  Submitting Spot: {"addr": "917–929 Carroll St, New York, NY", "lat": 40.66836559200441, "lon": -73.96038475114938}
+ LOG  🔵 API Request: POST /spots
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/spots
+ LOG  🔵 Request Data: {
+  "latitude": 40.66836559200441,
+  "longitude": -73.96038475114938,
+  "address": "917–929 Carroll St, New York, NY",
+  "price": 20
+}
+ LOG  🔑 Token added to request
+ LOG  Submitting Spot: {"addr": "917–929 Carroll St, New York, NY", "lat": 40.66836559200441, "lon": -73.96038475114938}
+ LOG  🔵 API Request: POST /spots
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/spots
+ LOG  🔵 Request Data: {
+  "latitude": 40.66836559200441,
+  "longitude": -73.96038475114938,
+  "address": "917–929 Carroll St, New York, NY",
+  "price": 20
+}
+ LOG  🔑 Token added to request
+ LOG  Submitting Spot: {"addr": "917–929 Carroll St, New York, NY", "lat": 40.66836559200441, "lon": -73.96038475114938}
+ LOG  🔵 API Request: POST /spots
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/spots
+ LOG  🔵 Request Data: {
+  "latitude": 40.66836559200441,
+  "longitude": -73.96038475114938,
+  "address": "917–929 Carroll St, New York, NY",
+  "price": 20
+}
+ LOG  🔑 Token added to request
+ LOG  Submitting Spot: {"addr": "917–929 Carroll St, New York, NY", "lat": 40.66836559200441, "lon": -73.96038475114938}
+ LOG  🔵 API Request: POST /spots
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/spots
+ LOG  🔵 Request Data: {
+  "latitude": 40.66836559200441,
+  "longitude": -73.96038475114938,
+  "address": "917–929 Carroll St, New York, NY",
+  "price": 20
+}
+ LOG  🔑 Token added to request
+ LOG  Submitting Spot: {"addr": "917–929 Carroll St, New York, NY", "lat": 40.66836559200441, "lon": -73.96038475114938}
+ LOG  🔵 API Request: POST /spots
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/spots
+ LOG  🔵 Request Data: {
+  "latitude": 40.66836559200441,
+  "longitude": -73.96038475114938,
+  "address": "917–929 Carroll St, New York, NY",
+  "price": 20
+}
+ LOG  🔑 Token added to request
+ LOG  Submitting Spot: {"addr": "917–929 Carroll St, New York, NY", "lat": 40.66836559200441, "lon": -73.96038475114938}
+ LOG  🔵 API Request: POST /spots
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/spots
+ LOG  🔵 Request Data: {
+  "latitude": 40.66836559200441,
+  "longitude": -73.96038475114938,
+  "address": "917–929 Carroll St, New York, NY",
+  "price": 20
+}
+ LOG  🔑 Token added to request
+ LOG  Submitting Spot: {"addr": "917–929 Carroll St, New York, NY", "lat": 40.66836559200441, "lon": -73.96038475114938}
+ LOG  🔵 API Request: POST /spots
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/spots
+ LOG  🔵 Request Data: {
+  "latitude": 40.66836559200441,
+  "longitude": -73.96038475114938,
+  "address": "917–929 Carroll St, New York, NY",
+  "price": 20
+}
+ LOG  🔑 Token added to request
+ LOG  Submitting Spot: {"addr": "917–929 Carroll St, New York, NY", "lat": 40.66836559200441, "lon": -73.96038475114938}
+ LOG  🔵 API Request: POST /spots
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/spots
+ LOG  🔵 Request Data: {
+  "latitude": 40.66836559200441,
+  "longitude": -73.96038475114938,
+  "address": "917–929 Carroll St, New York, NY",
+  "price": 13
+}
+ LOG  🔑 Token added to request
+ LOG  Submitting Spot: {"addr": "917–929 Carroll St, New York, NY", "lat": 40.66836559200441, "lon": -73.96038475114938}
+ LOG  🔵 API Request: POST /spots
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/spots
+ LOG  🔵 Request Data: {
+  "latitude": 40.66836559200441,
+  "longitude": -73.96038475114938,
+  "address": "917–929 Carroll St, New York, NY",
+  "price": 13
+}
+ LOG  🔑 Token added to request
+ LOG  Submitting Spot: {"addr": "917–929 Carroll St, New York, NY", "lat": 40.66836559200441, "lon": -73.96038475114938}
+ LOG  🔵 API Request: POST /spots
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/spots
+ LOG  🔵 Request Data: {
+  "latitude": 40.66836559200441,
+  "longitude": -73.96038475114938,
+  "address": "917–929 Carroll St, New York, NY",
+  "price": 13
+}
+ LOG  🔑 Token added to request
+ LOG  Submitting Spot: {"addr": "917–929 Carroll St, New York, NY", "lat": 40.66836559200441, "lon": -73.96038475114938}
+ LOG  🔵 API Request: POST /spots
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/spots
+ LOG  🔵 Request Data: {
+  "latitude": 40.66836559200441,
+  "longitude": -73.96038475114938,
+  "address": "917–929 Carroll St, New York, NY",
+  "price": 13
+}
+ LOG  🔑 Token added to request
+ LOG  Submitting Spot: {"addr": "917–929 Carroll St, New York, NY", "lat": 40.66836559200441, "lon": -73.96038475114938}
+ LOG  🔵 API Request: POST /spots
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/spots
+ LOG  🔵 Request Data: {
+  "latitude": 40.66836559200441,
+  "longitude": -73.96038475114938,
+  "address": "917–929 Carroll St, New York, NY",
+  "price": 13
+}
+ LOG  🔑 Token added to request
+ LOG  Fetching spots from backend...
+ LOG  🔵 API Request: GET /spots/available
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/spots/available
+ LOG  🔵 Request Data: undefined
+ LOG  🔑 Token added to request
+ ERROR  Text strings must be rendered within a <Text> component.
+ LOG  🔵 API Request: GET /users/me
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/users/me
+ LOG  🔵 Request Data: undefined
+ LOG  🔑 Token added to request
+ LOG  Fetching spots from backend...
+ LOG  🔵 API Request: GET /spots/available
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/spots/available
+ LOG  🔵 Request Data: undefined
+ LOG  🔑 Token added to request
+ LOG  Fetching spots from backend...
+ LOG  🔵 API Request: GET /spots/available
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/spots/available
+ LOG  🔵 Request Data: undefined
+ LOG  🔑 Token added to request
+ LOG  Fetching spots from backend...
+ LOG  🔵 API Request: GET /spots/available
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/spots/available
+ LOG  🔵 Request Data: undefined
+ LOG  🔑 Token added to request
+ LOG  Fetching spots from backend...
+ LOG  🔵 API Request: GET /spots/available
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/spots/available
+ LOG  🔵 Request Data: undefined
+ LOG  🔑 Token added to request
+ ERROR  ❌ API Error Response:
+ ERROR    URL: /spots/available
+ ERROR    Method: get
+ ERROR    Status: undefined
+ ERROR    Status Text: undefined
+ ERROR    Error Data: undefined
+ ERROR    Error Message: timeout exceeded
+ ERROR  Fetch failed [AxiosError: timeout exceeded]
+ ERROR  ❌ API Error Response:
+ ERROR    URL: /users/me
+ ERROR    Method: get
+ ERROR    Status: undefined
+ ERROR    Status Text: undefined
+ ERROR    Error Data: undefined
+ ERROR    Error Message: timeout exceeded
+ LOG  Error fetching user [AxiosError: timeout exceeded]
+ ERROR  ❌ API Error Response:
+ ERROR    URL: /spots/available
+ ERROR    Method: get
+ ERROR    Status: undefined
+ ERROR    Status Text: undefined
+ ERROR    Error Data: undefined
+ ERROR    Error Message: timeout exceeded
+ ERROR  Fetch failed [AxiosError: timeout exceeded]
+ ERROR  ❌ API Error Response:
+ ERROR    URL: /spots
+ ERROR    Method: get
+ ERROR    Status: undefined
+ ERROR    Status Text: undefined
+ ERROR    Error Data: undefined
+ ERROR    Error Message: timeout exceeded
+ ERROR  [AxiosError: timeout exceeded]
+ ERROR  ❌ API Error Response:
+ ERROR    URL: /spots/available
+ ERROR    Method: get
+ ERROR    Status: undefined
+ ERROR    Status Text: undefined
+ ERROR    Error Data: undefined
+ ERROR    Error Message: timeout exceeded
+ ERROR  Fetch failed [AxiosError: timeout exceeded]
+ ERROR  ❌ API Error Response:
+ ERROR    URL: /spots/available
+ ERROR    Method: get
+ ERROR    Status: undefined
+ ERROR    Status Text: undefined
+ ERROR    Error Data: undefined
+ ERROR    Error Message: timeout exceeded
+ ERROR  Fetch failed [AxiosError: timeout exceeded]
+ LOG  Submitting Spot: {"addr": "976 President St, New York, NY", "lat": 40.66842511204531, "lon": -73.96061968133884}
+ LOG  🔵 API Request: POST /spots
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/spots
+ LOG  🔵 Request Data: {
+  "latitude": 40.66842511204531,
+  "longitude": -73.96061968133884,
+  "address": "976 President St, New York, NY",
+  "photo_url": "file:///var/mobile/Containers/Data/Application/54CA4B7F-95A6-4AC0-A6B5-99843BEFEA1A/Library/Caches/ExponentExperienceData/@anonymous/parkpulse-c24b5e09-d6b0-48e0-a6b9-656e5d688150/ImagePicker/31AEBD3A-7187-481F-8D65-FC6B3737391A.jpg",
+  "price": 13
+}
+ LOG  🔑 Token added to request
+ LOG  Submitting Spot: {"addr": "976 President St, New York, NY", "lat": 40.66842511204531, "lon": -73.96061968133884}
+ LOG  🔵 API Request: POST /spots
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/spots
+ LOG  🔵 Request Data: {
+  "latitude": 40.66842511204531,
+  "longitude": -73.96061968133884,
+  "address": "976 President St, New York, NY",
+  "photo_url": "file:///var/mobile/Containers/Data/Application/54CA4B7F-95A6-4AC0-A6B5-99843BEFEA1A/Library/Caches/ExponentExperienceData/@anonymous/parkpulse-c24b5e09-d6b0-48e0-a6b9-656e5d688150/ImagePicker/31AEBD3A-7187-481F-8D65-FC6B3737391A.jpg",
+  "price": 13
+}
+ LOG  🔑 Token added to request
+ LOG  Submitting Spot: {"addr": "976 President St, New York, NY", "lat": 40.66842511204531, "lon": -73.96061968133884}
+ LOG  🔵 API Request: POST /spots
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/spots
+ LOG  🔵 Request Data: {
+  "latitude": 40.66842511204531,
+  "longitude": -73.96061968133884,
+  "address": "976 President St, New York, NY",
+  "photo_url": "file:///var/mobile/Containers/Data/Application/54CA4B7F-95A6-4AC0-A6B5-99843BEFEA1A/Library/Caches/ExponentExperienceData/@anonymous/parkpulse-c24b5e09-d6b0-48e0-a6b9-656e5d688150/ImagePicker/31AEBD3A-7187-481F-8D65-FC6B3737391A.jpg",
+  "price": 13
+}
+ LOG  🔑 Token added to request
+ LOG  Submitting Spot: {"addr": "976 President St, New York, NY", "lat": 40.66842511204531, "lon": -73.96061968133884}
+ LOG  🔵 API Request: POST /spots
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/spots
+ LOG  🔵 Request Data: {
+  "latitude": 40.66842511204531,
+  "longitude": -73.96061968133884,
+  "address": "976 President St, New York, NY",
+  "photo_url": "file:///var/mobile/Containers/Data/Application/54CA4B7F-95A6-4AC0-A6B5-99843BEFEA1A/Library/Caches/ExponentExperienceData/@anonymous/parkpulse-c24b5e09-d6b0-48e0-a6b9-656e5d688150/ImagePicker/31AEBD3A-7187-481F-8D65-FC6B3737391A.jpg",
+  "price": 13
+}
+ LOG  🔑 Token added to request
+ LOG  Submitting Spot: {"addr": "976 President St, New York, NY", "lat": 40.66842511204531, "lon": -73.96061968133884}
+ LOG  🔵 API Request: POST /spots
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/spots
+ LOG  🔵 Request Data: {
+  "latitude": 40.66842511204531,
+  "longitude": -73.96061968133884,
+  "address": "976 President St, New York, NY",
+  "photo_url": "file:///var/mobile/Containers/Data/Application/54CA4B7F-95A6-4AC0-A6B5-99843BEFEA1A/Library/Caches/ExponentExperienceData/@anonymous/parkpulse-c24b5e09-d6b0-48e0-a6b9-656e5d688150/ImagePicker/31AEBD3A-7187-481F-8D65-FC6B3737391A.jpg",
+  "price": 13
+}
+ LOG  🔑 Token added to request
+ ERROR  ❌ API Error Response:
+ ERROR    URL: /spots
+ ERROR    Method: post
+ ERROR    Status: undefined
+ ERROR    Status Text: undefined
+ ERROR    Error Data: undefined
+ ERROR    Error Message: Network Error
+ ERROR  🔴 NETWORK ERROR: Cannot reach backend server
+ ERROR    Make sure backend is running at: http://192.168.254.115:8000
+ ERROR  ❌ API Error Response:
+ ERROR    URL: /spots
+ ERROR    Method: post
+ ERROR    Status: undefined
+ ERROR    Status Text: undefined
+ ERROR    Error Data: undefined
+ ERROR    Error Message: timeout exceeded
+ ERROR  ❌ API Error Response:
+ ERROR    URL: /spots
+ ERROR    Method: post
+ ERROR    Status: undefined
+ ERROR    Status Text: undefined
+ ERROR    Error Data: undefined
+ ERROR    Error Message: timeout exceeded
+ ERROR  ❌ API Error Response:
+ ERROR    URL: /spots
+ ERROR    Method: post
+ ERROR    Status: undefined
+ ERROR    Status Text: undefined
+ ERROR    Error Data: undefined
+ ERROR    Error Message: timeout exceeded
+ ERROR  ❌ API Error Response:
+ ERROR    URL: /spots
+ ERROR    Method: post
+ ERROR    Status: undefined
+ ERROR    Status Text: undefined
+ ERROR    Error Data: undefined
+ ERROR    Error Message: Network Error
+ ERROR  🔴 NETWORK ERROR: Cannot reach backend server
+ ERROR    Make sure backend is running at: http://192.168.254.115:8000
+Unable to resolve asset "./assets/splash.png" from "splash.image" in your app.json or app.config.js
+iOS ./index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+iOS Bundled 63ms index.ts (1 module)
+ LOG  🌐 API Configuration:
+ LOG    API_BASE_URL from env: undefined
+ LOG    Using API_BASE_URL: http://192.168.254.115:8000
+ WARN  SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/th3rdwave/react-native-safe-area-context
+ LOG  Fetching spots from backend...
+ LOG  Fetching spots from backend...
+ LOG  Applied filters: MaxPrice=15. Result: 0 spots.
+ LOG  🔵 API Request: GET /spots/available
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/spots/available
+ LOG  🔵 Request Data: undefined
+ LOG  🔵 API Request: GET /users/me
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/users/me
+ LOG  🔵 Request Data: undefined
+ LOG  🔵 API Request: GET /spots/available
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/spots/available
+ LOG  🔵 Request Data: undefined
+ LOG  🔑 Token added to request
+ LOG  🔑 Token added to request
+ LOG  🔑 Token added to request
+ LOG  🔵 API Request: GET /spots
+ LOG  🔵 Base URL: http://192.168.254.115:8000
+ LOG  🔵 Full URL: http://192.168.254.115:8000/spots
+ LOG  🔵 Request Data: undefined
+ LOG  🔑 Token added to request
+ ERROR  ❌ API Error Response:
+ ERROR    URL: /spots/available
+ ERROR    Method: get
+ ERROR    Status: undefined
+ ERROR    Status Text: undefined
+ ERROR    Error Data: undefined
+ ERROR    Error Message: timeout exceeded
+ ERROR  Fetch failed [AxiosError: timeout exceeded]
+ ERROR  ❌ API Error Response:
+ ERROR    URL: /users/me
+ ERROR    Method: get
+ ERROR    Status: undefined
+ ERROR    Status Text: undefined
+ ERROR    Error Data: undefined
+ ERROR    Error Message: timeout exceeded
+ LOG  Error fetching user [AxiosError: timeout exceeded]
+ ERROR  ❌ API Error Response:
+ ERROR    URL: /spots/available
+ ERROR    Method: get
+ ERROR    Status: undefined
+ ERROR    Status Text: undefined
+ ERROR    Error Data: undefined
+ ERROR    Error Message: timeout exceeded
+ ERROR  Fetch failed [AxiosError: timeout exceeded]
+ LOG  🌐 API Configuration:
+ LOG    API_BASE_URL from env: undefined
+ LOG    Using API_BASE_URL: http://192.168.1.192:8000
+ LOG  Fetching spots from backend...
+ LOG  Applied filters: MaxPrice=15. Result: 0 spots.
+ LOG  🔵 API Request: GET /spots/available
+ LOG  🔵 Base URL: http://192.168.1.192:8000
+ LOG  🔵 Full URL: http://192.168.1.192:8000/spots/available
+ LOG  🔵 Request Data: undefined
+ LOG  🔵 API Request: GET /users/me
+ LOG  🔵 Base URL: http://192.168.1.192:8000
+ LOG  🔵 Full URL: http://192.168.1.192:8000/users/me
+ LOG  🔵 Request Data: undefined
+ LOG  🔵 API Request: GET /spots
+ LOG  🔵 Base URL: http://192.168.1.192:8000
+ LOG  🔵 Full URL: http://192.168.1.192:8000/spots
+ LOG  🔵 Request Data: undefined
+ ERROR  ❌ API Error Response:
+ ERROR    URL: /spots
+ ERROR    Method: get
+ ERROR    Status: undefined
+ ERROR    Status Text: undefined
+ ERROR    Error Data: undefined
+ ERROR    Error Message: timeout exceeded
+ ERROR  [AxiosError: timeout exceeded]
+ LOG  🔑 Token added to request
+ LOG  🔑 Token added to request
+ LOG  🔑 Token added to request
+ LOG  ✅ API Response: 200 /users/me
+ LOG  ✅ Response Data: {
+  "id": 2,
+  "email": "pulser@test.com",
+  "role": "pulser",
+  "balance": "0.00",
+  "reputation": null,
+  "banned": false,
+  "ban_reason": null,
+  "appeal_status": "none",
+  "created_at": "2026-02-05T01:33:09.917163-08:00"
+}
+ LOG  ✅ API Response: 200 /spots/available
+ LOG  ✅ Response Data: []
+ LOG  Fetched 0 spots.
+ LOG  ✅ API Response: 200 /spots
+ LOG  ✅ Response Data: [
+  {
+    "id": 13,
+    "pulser_id": 2,
+    "latitude": 33.86389957,
+    "longitude": -118.36699621,
+    "address": "2407 Ives Ln, Redondo Beach, CA",
+    "photo_url": null,
+    "reported_at": "2026-02-05T22:29:14.261785-08:00",
+    "expires_at": "2026-02-05T22:33:14.273799-08:00",
+    "status": "available",
+    "price": 17,
+    "confidence": "Low",
+    "claimed_by_user_id": null,
+    "claimed_at": null,
+    "claim_expires_at": null,
+    "taken_confirmed_at": null
+  },
+  {
+    "id": 12,
+    "pulser_id": 2,
+    "latitude": 33.87094436,
+    "longitude": -118.37678279,
+    "address": "2001 Carnegie Ln, Redondo Beach, CA",
+    "photo_url": "file:///var/mobile/Containers/Data/Application/54CA4B7F-95A6-4AC0-A6B5-99843BEFEA1A/Library/Caches/ExponentExperienceData/@anonymous/parkpulse-c24b5e09-d6b0-48e0-a6b9-656e5d688150/ImagePicker/98CB4F31-7D1D-48B8-98E4-6BB09633CC9E.jpg",
+    "reported_at": "2026-02-05T18:04:21.927338-08:00",
+    "expires_at": "2026-02-05T18:08:21.949302-08:00",
+    "status": "available",
+    "price": 20,
+    "confidence": "Medium",
+    "claimed_by_user_id": null,
+    "claimed_at": null,
+    "claim_expires_at": null,
+    "taken_confirmed_at": null
+  },
+  {
+    "id": 10,
+    "pulser_id": 2,
+    "latitude": 33.8638638,
+    "longitude": -118.36579823,
+    "address": "2449–2499 Ives Ln, Redondo Beach, CA",
+    "photo_url": "file:///var/mobile/Containers/Data/Application/54CA4B7F-95A6-4AC0-A6B5-99843BEFEA1A/Library/Caches/ExponentExperienceData/@anonymous/parkpulse-c24b5e09-d6b0-48e0-a6b9-656e5d688150/ImagePicker/63B5AE78-61EE-406A-B3A6-D23097CB2BB3.jpg",
+    "reported_at": "2026-02-05T14:47:59.496929-08:00",
+    "expires_at": "2026-02-05T14:51:59.512914-08:00",
+    "status": "available",
+    "price": 5,
+    "confidence": "Medium",
+    "claimed_by_user_id": null,
+    "claimed_at": null,
+    "claim_expires_at": null,
+    "taken_confirmed_at": null
+  },
+  {
+    "id": 9,
+    "pulser_id": 2,
+    "latitude": 33.8638932,
+    "longitude": -118.36697116,
+    "address": "2407 Ives Ln, Redondo Beach, CA",
+    "photo_url": null,
+    "reported_at": "2026-02-05T14:46:49.278850-08:00",
+    "expires_at": "2026-02-05T14:50:49.301570-08:00",
+    "status": "available",
+    "price": 5,
+    "confidence": "Low",
+    "claimed_by_user_id": null,
+    "claimed_at": null,
+    "claim_expires_at": null,
+    "taken_confirmed_at": null
+  }
+]
+ LOG  Applied filters: MaxPrice=15. Result: 0 spots.
+Unable to resolve asset "./assets/splash.png" from "splash.image" in your app.json or app.config.js
+iOS ./index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+iOS Bundled 71ms index.ts (1 module)
+ LOG  🌐 API Configuration:
+ LOG    API_BASE_URL from env: undefined
+ LOG    Using API_BASE_URL: http://192.168.1.192:8000
+ WARN  SafeAreaView has been deprecated and will be removed in a future release. Please use 'react-native-safe-area-context' instead. See https://github.com/th3rdwave/react-native-safe-area-context
+ LOG  Fetching spots from backend...
+ LOG  Fetching spots from backend...
+ LOG  Applied filters: MaxPrice=15. Result: 0 spots.
+ LOG  🔵 API Request: GET /spots/available
+ LOG  🔵 Base URL: http://192.168.1.192:8000
+ LOG  🔵 Full URL: http://192.168.1.192:8000/spots/available
+ LOG  🔵 Request Data: undefined
+ LOG  🔵 API Request: GET /users/me
+ LOG  🔵 Base URL: http://192.168.1.192:8000
+ LOG  🔵 Full URL: http://192.168.1.192:8000/users/me
+ LOG  🔵 Request Data: undefined
+ LOG  🔵 API Request: GET /spots/available
+ LOG  🔵 Base URL: http://192.168.1.192:8000
+ LOG  🔵 Full URL: http://192.168.1.192:8000/spots/available
+ LOG  🔵 Request Data: undefined
+ LOG  🔑 Token added to request
+ LOG  🔑 Token added to request
+ LOG  🔑 Token added to request
+ LOG  ✅ API Response: 200 /spots/available
+ LOG  ✅ Response Data: []
+ LOG  Fetched 0 spots.
+ LOG  ✅ API Response: 200 /users/me
+ LOG  ✅ Response Data: {
+  "id": 2,
+  "email": "pulser@test.com",
+  "role": "pulser",
+  "balance": "0.00",
+  "reputation": null,
+  "banned": false,
+  "ban_reason": null,
+  "appeal_status": "none",
+  "created_at": "2026-02-05T01:33:09.917163-08:00"
+}
+ LOG  ✅ API Response: 200 /spots/available
+ LOG  ✅ Response Data: []
+ LOG  Fetched 0 spots.
+ LOG  Applied filters: MaxPrice=15. Result: 0 spots.
+ LOG  🔵 API Request: GET /spots
+ LOG  🔵 Base URL: http://192.168.1.192:8000
+ LOG  🔵 Full URL: http://192.168.1.192:8000/spots
+ LOG  🔵 Request Data: undefined
+ LOG  🔑 Token added to request
+ LOG  ✅ API Response: 200 /spots
+ LOG  ✅ Response Data: [
+  {
+    "id": 13,
+    "pulser_id": 2,
+    "latitude": 33.86389957,
+    "longitude": -118.36699621,
+    "address": "2407 Ives Ln, Redondo Beach, CA",
+    "photo_url": null,
+    "reported_at": "2026-02-05T22:29:14.261785-08:00",
+    "expires_at": "2026-02-05T22:33:14.273799-08:00",
+    "status": "available",
+    "price": 17,
+    "confidence": "Low",
+    "claimed_by_user_id": null,
+    "claimed_at": null,
+    "claim_expires_at": null,
+    "taken_confirmed_at": null
+  },
+  {
+    "id": 12,
+    "pulser_id": 2,
+    "latitude": 33.87094436,
+    "longitude": -118.37678279,
+    "address": "2001 Carnegie Ln, Redondo Beach, CA",
+    "photo_url": "file:///var/mobile/Containers/Data/Application/54CA4B7F-95A6-4AC0-A6B5-99843BEFEA1A/Library/Caches/ExponentExperienceData/@anonymous/parkpulse-c24b5e09-d6b0-48e0-a6b9-656e5d688150/ImagePicker/98CB4F31-7D1D-48B8-98E4-6BB09633CC9E.jpg",
+    "reported_at": "2026-02-05T18:04:21.927338-08:00",
+    "expires_at": "2026-02-05T18:08:21.949302-08:00",
+    "status": "available",
+    "price": 20,
+    "confidence": "Medium",
+    "claimed_by_user_id": null,
+    "claimed_at": null,
+    "claim_expires_at": null,
+    "taken_confirmed_at": null
+  },
+  {
+    "id": 10,
+    "pulser_id": 2,
+    "latitude": 33.8638638,
+    "longitude": -118.36579823,
+    "address": "2449–2499 Ives Ln, Redondo Beach, CA",
+    "photo_url": "file:///var/mobile/Containers/Data/Application/54CA4B7F-95A6-4AC0-A6B5-99843BEFEA1A/Library/Caches/ExponentExperienceData/@anonymous/parkpulse-c24b5e09-d6b0-48e0-a6b9-656e5d688150/ImagePicker/63B5AE78-61EE-406A-B3A6-D23097CB2BB3.jpg",
+    "reported_at": "2026-02-05T14:47:59.496929-08:00",
+    "expires_at": "2026-02-05T14:51:59.512914-08:00",
+    "status": "available",
+    "price": 5,
+    "confidence": "Medium",
+    "claimed_by_user_id": null,
+    "claimed_at": null,
+    "claim_expires_at": null,
+    "taken_confirmed_at": null
+  },
+  {
+    "id": 9,
+    "pulser_id": 2,
+    "latitude": 33.8638932,
+    "longitude": -118.36697116,
+    "address": "2407 Ives Ln, Redondo Beach, CA",
+    "photo_url": null,
+    "reported_at": "2026-02-05T14:46:49.278850-08:00",
+    "expires_at": "2026-02-05T14:50:49.301570-08:00",
+    "status": "available",
+    "price": 5,
+    "confidence": "Low",
+    "claimed_by_user_id": null,
+    "claimed_at": null,
+    "claim_expires_at": null,
+    "taken_confirmed_at": null
+  }
+]
+ LOG  Submitting Spot: {"addr": "40 Washington St, New York, NY", "lat": 40.703100668924954, "lon": -73.98965757223418, "photo": undefined}
+ LOG  🔵 API Request: POST /spots
+ LOG  🔵 Base URL: http://192.168.1.192:8000
+ LOG  🔵 Full URL: http://192.168.1.192:8000/spots
+ LOG  🔵 Request Data: {
+  "latitude": 40.703100668924954,
+  "longitude": -73.98965757223418,
+  "address": "40 Washington St, New York, NY",
+  "price": 14
+}
+ LOG  🔑 Token added to request
+ LOG  ✅ API Response: 201 /spots
+ LOG  ✅ Response Data: {
+  "id": 14,
+  "pulser_id": 2,
+  "latitude": 40.70310067,
+  "longitude": -73.98965757,
+  "address": "40 Washington St, New York, NY",
+  "photo_url": null,
+  "reported_at": "2026-02-09T19:36:42.209787-08:00",
+  "expires_at": "2026-02-09T19:40:42.229082-08:00",
+  "status": "available",
+  "price": 14,
+  "confidence": "Medium",
+  "claimed_by_user_id": null,
+  "claimed_at": null,
+  "claim_expires_at": null,
+  "taken_confirmed_at": null
+}
+ LOG  🔵 API Request: GET /spots
+ LOG  🔵 Base URL: http://192.168.1.192:8000
+ LOG  🔵 Full URL: http://192.168.1.192:8000/spots
+ LOG  🔵 Request Data: undefined
+ LOG  🔑 Token added to request
+ LOG  ✅ API Response: 200 /spots
+ LOG  ✅ Response Data: [
+  {
+    "id": 14,
+    "pulser_id": 2,
+    "latitude": 40.70310067,
+    "longitude": -73.98965757,
+    "address": "40 Washington St, New York, NY",
+    "photo_url": null,
+    "reported_at": "2026-02-09T19:36:42.209787-08:00",
+    "expires_at": "2026-02-09T19:40:42.229082-08:00",
+    "status": "available",
+    "price": 14,
+    "confidence": "Medium",
+    "claimed_by_user_id": null,
+    "claimed_at": null,
+    "claim_expires_at": null,
+    "taken_confirmed_at": null
+  },
+  {
+    "id": 13,
+    "pulser_id": 2,
+    "latitude": 33.86389957,
+    "longitude": -118.36699621,
+    "address": "2407 Ives Ln, Redondo Beach, CA",
+    "photo_url": null,
+    "reported_at": "2026-02-05T22:29:14.261785-08:00",
+    "expires_at": "2026-02-05T22:33:14.273799-08:00",
+    "status": "available",
+    "price": 17,
+    "confidence": "Low",
+    "claimed_by_user_id": null,
+    "claimed_at": null,
+    "claim_expires_at": null,
+    "taken_confirmed_at": null
+  },
+  {
+    "id": 12,
+    "pulser_id": 2,
+    "latitude": 33.87094436,
+    "longitude": -118.37678279,
+    "address": "2001 Carnegie Ln, Redondo Beach, CA",
+    "photo_url": "file:///var/mobile/Containers/Data/Application/54CA4B7F-95A6-4AC0-A6B5-99843BEFEA1A/Library/Caches/ExponentExperienceData/@anonymous/parkpulse-c24b5e09-d6b0-48e0-a6b9-656e5d688150/ImagePicker/98CB4F31-7D1D-48B8-98E4-6BB09633CC9E.jpg",
+    "reported_at": "2026-02-05T18:04:21.927338-08:00",
+    "expires_at": "2026-02-05T18:08:21.949302-08:00",
+    "status": "available",
+    "price": 20,
+    "confidence": "Medium",
+    "claimed_by_user_id": null,
+    "claimed_at": null,
+    "claim_expires_at": null,
+    "taken_confirmed_at": null
+  },
+  {
+    "id": 10,
+    "pulser_id": 2,
+    "latitude": 33.8638638,
+    "longitude": -118.36579823,
+    "address": "2449–2499 Ives Ln, Redondo Beach, CA",
+    "photo_url": "file:///var/mobile/Containers/Data/Application/54CA4B7F-95A6-4AC0-A6B5-99843BEFEA1A/Library/Caches/ExponentExperienceData/@anonymous/parkpulse-c24b5e09-d6b0-48e0-a6b9-656e5d688150/ImagePicker/63B5AE78-61EE-406A-B3A6-D23097CB2BB3.jpg",
+    "reported_at": "2026-02-05T14:47:59.496929-08:00",
+    "expires_at": "2026-02-05T14:51:59.512914-08:00",
+    "status": "available",
+    "price": 5,
+    "confidence": "Medium",
+    "claimed_by_user_id": null,
+    "claimed_at": null,
+    "claim_expires_at": null,
+    "taken_confirmed_at": null
+  },
+  {
+    "id": 9,
+    "pulser_id": 2,
+    "latitude": 33.8638932,
+    "longitude": -118.36697116,
+    "address": "2407 Ives Ln, Redondo Beach, CA",
+    "photo_url": null,
+    "reported_at": "2026-02-05T14:46:49.278850-08:00",
+    "expires_at": "2026-02-05T14:50:49.301570-08:00",
+    "status": "available",
+    "price": 5,
+    "confidence": "Low",
+    "claimed_by_user_id": null,
+    "claimed_at": null,
+    "claim_expires_at": null,
+    "taken_confirmed_at": null
+  }
+]
+ LOG  Fetching spots from backend...
+ LOG  🔵 API Request: GET /spots/available
+ LOG  🔵 Base URL: http://192.168.1.192:8000
+ LOG  🔵 Full URL: http://192.168.1.192:8000/spots/available
+ LOG  🔵 Request Data: undefined
+ LOG  🔑 Token added to request
+ LOG  ✅ API Response: 200 /spots/available
+ LOG  ✅ Response Data: [
+  {
+    "id": 14,
+    "pulser_id": 2,
+    "latitude": 40.70310067,
+    "longitude": -73.98965757,
+    "address": "40 Washington St, New York, NY",
+    "photo_url": null,
+    "reported_at": "2026-02-09T19:36:42.209787-08:00",
+    "expires_at": "2026-02-09T19:40:42.229082-08:00",
+    "status": "available",
+    "price": 14,
+    "confidence": "Medium",
+    "claimed_by_user_id": null,
+    "claimed_at": null,
+    "claim_expires_at": null,
+    "taken_confirmed_at": null
+  }
+]
+ LOG  Fetched 1 spots.
+ LOG  Applied filters: MaxPrice=15. Result: 1 spots.
+ LOG  🔵 API Request: POST /spots/14/claim
+ LOG  🔵 Base URL: http://192.168.1.192:8000
+ LOG  🔵 Full URL: http://192.168.1.192:8000/spots/14/claim
+ LOG  🔵 Request Data: undefined
+ LOG  🔑 Token added to request
+ LOG  ✅ API Response: 200 /spots/14/claim
+ LOG  ✅ Response Data: {
+  "id": 14,
+  "pulser_id": 2,
+  "latitude": 40.70310067,
+  "longitude": -73.98965757,
+  "address": "40 Washington St, New York, NY",
+  "photo_url": null,
+  "reported_at": "2026-02-09T19:36:42.209787-08:00",
+  "expires_at": "2026-02-09T19:40:42.229082-08:00",
+  "status": "claimed",
+  "price": 14,
+  "confidence": "Medium",
+  "claimed_by_user_id": 2,
+  "claimed_at": "2026-02-09T19:38:24.306424-08:00",
+  "claim_expires_at": "2026-02-09T19:40:24.306424-08:00",
+  "taken_confirmed_at": null
+}
+ LOG  Applied filters: MaxPrice=15. Result: 1 spots.
